@@ -1,0 +1,9 @@
+{
+  "name": "[[ cookiecutter.project_slug ]]-ci",
+  "engineVersion": "v[[ cookiecutter.dagger_version ]]",
+  "sdk": {
+    "source": "python"
+  },
+  "source": "ci",
+  "disableDefaultFunctionCaching": true
+}

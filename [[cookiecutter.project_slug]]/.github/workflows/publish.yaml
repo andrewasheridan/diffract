@@ -1,0 +1,68 @@
+# Publish [[ cookiecutter.project_slug ]] to PyPI on version tag push.
+#
+# Prerequisites — register this repo as a trusted publisher on pypi.org:
+#   pypi.org → Account Settings → Publishing → Add a new pending publisher
+#     Owner:      andrewasheridan
+#     Repository: [[ cookiecutter.github_repo ]]
+#     Workflow:   publish.yaml
+#     Environment: pypi   (must match the `environment:` name on the publish job)
+#
+# Once registered, PyPI trusts GitHub's OIDC token — no API token secrets needed.
+#
+# Triggered by tag-on-merge.yaml pushing a v* tag. Using push.tags (not
+# workflow_call) so GitHub issues a first-party OIDC token — workflow_call
+# produces a reusable-workflow token that PyPI's trusted publisher rejects.
+
+name: Publish
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:  # Allows manual re-runs via gh CLI or UI
+
+jobs:
+  build:
+    name: Build distribution
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "[[ cookiecutter.python_version ]]"
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Build sdist and wheel
+        run: uvx --from build pyproject-build
+
+      - name: Upload dist artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/[[ cookiecutter.project_slug ]]
+    permissions:
+      contents: read
+      id-token: write  # required for OIDC trusted publishing
+
+    steps:
+      - name: Download dist artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
