@@ -14,6 +14,7 @@ __all__ = [
     "SurfaceError",
     "__version__",
     "check",
+    "foo",
     "load_config",
 ]
 
@@ -29,3 +30,7 @@ try:
     __version__: str = importlib.metadata.version("sheridan-diffract")
 except importlib.metadata.PackageNotFoundError:
     __version__ = "0.0.0+unknown"
+
+
+def foo() -> None:
+    return None
