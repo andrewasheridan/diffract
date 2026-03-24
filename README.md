@@ -134,12 +134,44 @@ Priority: explicit `--src` flag → `diffract.toml` → `pyproject.toml` → def
 
 ### As a GitHub Actions check
 
+Validate the **PR title** against detected API changes — the CI equivalent of the pre-commit hook.
+The refs to diff are the PR branch HEAD versus the target branch HEAD:
+
 ```yaml
-- name: Check API classification
-  run: diffract --exit-code --json
+# .github/workflows/diffract.yml
+name: diffract
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]  # 'edited' catches title-only changes
+
+jobs:
+  api-change-check:
+    name: Validate PR title against API changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # required to access both commit SHAs
+
+      - name: Install diffract
+        run: pip install sheridan-diffract
+
+      - name: Validate PR title type matches API change
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          printf '%s' "$PR_TITLE" > /tmp/pr-title.txt
+          diffract \
+            ${{ github.event.pull_request.base.sha }} \
+            ${{ github.event.pull_request.head.sha }} \
+            --validate-msg-file /tmp/pr-title.txt
 ```
 
-Fails the build if a breaking change is not flagged as `feat!` in the commit message.
+- `base.sha` — HEAD of the target branch (e.g. `main`) at the time of the PR event
+- `head.sha` — HEAD of the PR branch
+- Non-conventional title prefixes (`docs:`, `chore:`, `test:`, etc.) are never blocked
+- Scopes are passed through: a title of `feat(parser): …` will suggest `feat(parser):` on mismatch
 
 ## What it does not do
 
