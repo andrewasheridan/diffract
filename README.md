@@ -92,6 +92,15 @@ import json
 print(json.dumps(result.to_dict(), indent=2))
 ```
 
+To compare `HEAD` against the **staging area** (what the next commit will contain) — the same comparison the pre-commit hook uses:
+
+```python
+from sheridan.diffract import check_staged
+
+result = check_staged()
+print(result.commit_type)  # reflects what is staged, not the last commit
+```
+
 ### Validate commit messages with pre-commit
 
 `diffract` ships a `commit-msg` hook that rejects commits whose conventional commit type doesn't match the detected API change — catching `fix:` when you actually removed a public name.
@@ -104,6 +113,9 @@ repos:
     hooks:
       - id: diffract-validate
 ```
+- make sure to `pre-commit install --hook-type commit-msg` first
+
+The hook compares `HEAD` against the **git staging area** (not `HEAD~1 → HEAD`), so it correctly detects what is about to be committed rather than what was committed last. Explicit `BASE`/`HEAD` refs can be added to override this (see the GitHub Actions example below).
 
 Scopes are preserved in all output — if you write `fix(parser): …`, the mismatch message will show `fix(parser):` as written and `feat(parser):` as the suggested replacement:
 

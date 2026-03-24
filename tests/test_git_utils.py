@@ -8,7 +8,13 @@ from unittest.mock import MagicMock
 import pytest
 
 from sheridan.diffract.exceptions import GitError, SurfaceError
-from sheridan.diffract.git_utils import get_api_at_ref, get_repo, has_python_changes
+from sheridan.diffract.git_utils import (
+    get_api_at_index,
+    get_api_at_ref,
+    get_repo,
+    has_python_changes,
+    has_python_changes_index,
+)
 
 
 class TestGetRepo:
@@ -146,3 +152,148 @@ class TestGetApiAtRef:
         # tmp_path has no "src" subdirectory, so the fallback to tmp root is triggered.
         get_api_at_ref(repo, "HEAD", src_path="src")
         assert captured[0] == tmp_path
+
+
+class TestGetApiAtIndex:
+    """Tests for get_api_at_index()."""
+
+    def _setup_index_mocks(
+        self,
+        repo: MagicMock,
+        tmp_path: Path,
+        mock_tmpdir: MagicMock,
+        mock_tar_open: MagicMock,
+        tree_sha: str = "abc123",
+    ) -> None:
+        mock_tree = MagicMock()
+        mock_tree.hexsha = tree_sha
+        repo.index.write_tree.return_value = mock_tree
+
+        mock_proc = MagicMock()
+        mock_proc.stdout = MagicMock()
+        repo.git.archive.return_value = mock_proc
+
+        mock_tmpdir.return_value.__enter__.return_value = str(tmp_path)
+        mock_tmpdir.return_value.__exit__.return_value = False
+        mock_tar_open.return_value.__enter__.return_value = MagicMock()
+        mock_tar_open.return_value.__exit__.return_value = False
+
+    def test_returns_api_mapping_on_success(
+        self,
+        tmp_path: Path,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        repo = MagicMock()
+        expected: dict[str, list[str]] = {"mypackage.mod": ["Foo", "Bar"]}
+        mock_tar_open = mocker.patch("sheridan.diffract.git_utils.tarfile.open")
+        mock_tmpdir = mocker.patch("sheridan.diffract.git_utils.tempfile.TemporaryDirectory")
+        mocker.patch("sheridan.diffract.git_utils.get_public_api", return_value=expected)
+        self._setup_index_mocks(repo, tmp_path, mock_tmpdir, mock_tar_open)
+
+        assert get_api_at_index(repo) == expected
+
+    def test_uses_tree_sha_for_archive(
+        self,
+        tmp_path: Path,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        repo = MagicMock()
+        mock_tar_open = mocker.patch("sheridan.diffract.git_utils.tarfile.open")
+        mock_tmpdir = mocker.patch("sheridan.diffract.git_utils.tempfile.TemporaryDirectory")
+        mocker.patch("sheridan.diffract.git_utils.get_public_api", return_value={})
+        self._setup_index_mocks(repo, tmp_path, mock_tmpdir, mock_tar_open, tree_sha="deadbeef")
+
+        get_api_at_index(repo)
+
+        repo.git.archive.assert_called_once_with("deadbeef", format="tar", as_process=True)
+
+    def test_raises_surface_error_when_iceberg_fails(
+        self,
+        tmp_path: Path,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        repo = MagicMock()
+        mock_tar_open = mocker.patch("sheridan.diffract.git_utils.tarfile.open")
+        mock_tmpdir = mocker.patch("sheridan.diffract.git_utils.tempfile.TemporaryDirectory")
+        mocker.patch("sheridan.diffract.git_utils.get_public_api", side_effect=RuntimeError("boom"))
+        self._setup_index_mocks(repo, tmp_path, mock_tmpdir, mock_tar_open)
+
+        with pytest.raises(SurfaceError, match="Failed to extract public API from index"):
+            get_api_at_index(repo)
+
+    def test_propagates_exception_when_write_tree_fails(
+        self,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        # write_tree() failures are not wrapped — they propagate to the caller.
+        repo = MagicMock()
+        repo.index.write_tree.side_effect = Exception("index error")
+
+        with pytest.raises(Exception, match="index error"):
+            get_api_at_index(repo)
+
+    def test_falls_back_to_tmp_root_when_src_path_missing(
+        self,
+        tmp_path: Path,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        repo = MagicMock()
+        captured: list[Path] = []
+
+        def capture(path: Path) -> dict[str, list[str]]:
+            captured.append(path)
+            return {}
+
+        mock_tar_open = mocker.patch("sheridan.diffract.git_utils.tarfile.open")
+        mock_tmpdir = mocker.patch("sheridan.diffract.git_utils.tempfile.TemporaryDirectory")
+        mocker.patch("sheridan.diffract.git_utils.get_public_api", side_effect=capture)
+        self._setup_index_mocks(repo, tmp_path, mock_tmpdir, mock_tar_open)
+
+        # tmp_path has no "src" subdirectory, so the fallback to tmp root is triggered.
+        get_api_at_index(repo, src_path="src")
+        assert captured[0] == tmp_path
+
+
+class TestHasPythonChangesIndex:
+    """Tests for has_python_changes_index()."""
+
+    def _diff_item(self, a_path: str, b_path: str) -> MagicMock:
+        item = MagicMock()
+        item.a_path = a_path
+        item.b_path = b_path
+        return item
+
+    def test_returns_true_when_py_file_in_index_diff(self) -> None:
+        repo = MagicMock()
+        diff_item = self._diff_item("module.py", "module.py")
+        repo.head.commit.diff.return_value = [diff_item]
+        assert has_python_changes_index(repo) is True
+
+    def test_returns_false_when_only_non_py_files_in_index_diff(self) -> None:
+        repo = MagicMock()
+        diff_item = self._diff_item("README.md", "README.md")
+        repo.head.commit.diff.return_value = [diff_item]
+        assert has_python_changes_index(repo) is False
+
+    def test_returns_false_when_index_diff_is_empty(self) -> None:
+        repo = MagicMock()
+        repo.head.commit.diff.return_value = []
+        assert has_python_changes_index(repo) is False
+
+    def test_returns_true_on_initial_commit(self) -> None:
+        repo = MagicMock()
+        # Simulate initial commit: accessing head.commit raises ValueError.
+        type(repo.head).commit = property(lambda self: (_ for _ in ()).throw(ValueError("no HEAD")))
+        assert has_python_changes_index(repo) is True
+
+    def test_detects_py_change_via_b_path(self) -> None:
+        repo = MagicMock()
+        diff_item = self._diff_item("", "new_module.py")
+        repo.head.commit.diff.return_value = [diff_item]
+        assert has_python_changes_index(repo) is True
+
+    def test_diff_called_with_index_true(self) -> None:
+        repo = MagicMock()
+        repo.head.commit.diff.return_value = []
+        has_python_changes_index(repo)
+        repo.head.commit.diff.assert_called_once_with(index=True)

@@ -12,7 +12,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from sheridan.diffract import __version__
-from sheridan.diffract.checker import check
+from sheridan.diffract.checker import check, check_staged
 from sheridan.diffract.config import load_config
 from sheridan.diffract.enums import CommitType
 from sheridan.diffract.exceptions import DiffractError
@@ -40,16 +40,25 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "base_ref",
         nargs="?",
-        default="HEAD~1",
+        default=None,
         metavar="BASE_REF",
-        help="The earlier git ref to compare (default: HEAD~1).",
+        help=(
+            "The earlier git ref to compare (default: HEAD~1). "
+            "When --validate-msg-file is used without explicit refs, "
+            "diffract automatically compares HEAD vs the staging area."
+        ),
     )
     parser.add_argument(
         "head_ref",
         nargs="?",
-        default="HEAD",
+        default=None,
         metavar="HEAD_REF",
-        help="The later git ref to compare (default: HEAD).",
+        help=(
+            "The later git ref to compare (default: HEAD). "
+            "If only BASE_REF is given, HEAD is used as HEAD_REF. "
+            "When --validate-msg-file is used without explicit refs, "
+            "diffract automatically compares HEAD vs the staging area."
+        ),
     )
     parser.add_argument(
         "--src",
@@ -231,8 +240,12 @@ def main() -> None:
     """CLI entrypoint for diffract.
 
     Loads configuration from config files (if present), parses command-line arguments,
-    and invokes the check() function to detect API changes. Outputs results as
-    human-readable text or JSON, and optionally validates commit message types.
+    and invokes the check() or check_staged() function to detect API changes. Outputs
+    results as human-readable text or JSON, and optionally validates commit message types.
+
+    When ``--validate-msg-file`` is provided without explicit BASE_REF/HEAD_REF positional
+    arguments, diffract automatically compares ``HEAD`` against the current staging area
+    via :func:`~sheridan.diffract.checker.check_staged`.
 
     Exits with code:
       - 0: No changes detected (or --exit-code not set)
@@ -255,12 +268,15 @@ def main() -> None:
     src_path: str = args.src_path or config.src or "src"
 
     try:
-        result = check(
-            base_ref=args.base_ref,
-            head_ref=args.head_ref,
-            repo_path=repo_path,
-            src_path=src_path,
-        )
+        if args.validate_msg_file is not None and not args.base_ref and not args.head_ref:
+            result = check_staged(repo_path=repo_path, src_path=src_path)
+        else:
+            result = check(
+                base_ref=args.base_ref or "HEAD~1",
+                head_ref=args.head_ref or "HEAD",
+                repo_path=repo_path,
+                src_path=src_path,
+            )
     except DiffractError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(3)

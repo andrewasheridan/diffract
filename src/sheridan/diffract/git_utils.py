@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-__all__ = ["get_api_at_ref", "get_repo", "has_python_changes"]
+__all__ = [
+    "get_api_at_index",
+    "get_api_at_ref",
+    "get_repo",
+    "has_python_changes",
+    "has_python_changes_index",
+]
 
 import tarfile
 import tempfile
@@ -90,6 +96,74 @@ def has_python_changes(repo: Repo, base_ref: str, head_ref: str) -> bool:
     base_commit = repo.commit(base_ref)
     head_commit = repo.commit(head_ref)
     diffs = base_commit.diff(head_commit)
+    for d in diffs:
+        a_path: str = d.a_path or ""
+        b_path: str = d.b_path or ""
+        if a_path.endswith(".py") or b_path.endswith(".py"):
+            return True
+    return False
+
+
+def get_api_at_index(repo: Repo, src_path: str = "src") -> dict[str, list[str]]:
+    """Extract the public API surface from the current git staging area (index).
+
+    Materialises the staged tree via ``repo.index.write_tree()``, then uses
+    ``git archive`` on the resulting tree SHA to extract files into a temporary
+    directory before invoking ``sheridan.iceberg.get_public_api()``.
+
+    Args:
+        repo: The git repository whose index (staging area) to inspect.
+        src_path: Relative path within the repo that contains Python packages.
+
+    Returns:
+        A mapping of fully-qualified module name to list of public names,
+        as returned by ``sheridan.iceberg.get_public_api``.
+
+    Raises:
+        GitError: If tree materialisation or archive extraction fails.
+        SurfaceError: If ``get_public_api`` raises any exception.
+
+    Notes:
+        ``write_tree()`` flushes the in-memory index to ``.git/index`` as a
+        side effect before returning the tree object.
+    """
+    tree = repo.index.write_tree()
+    tree_sha: str = tree.hexsha
+
+    with tempfile.TemporaryDirectory() as tmp:
+        proc = repo.git.archive(tree_sha, format="tar", as_process=True)
+        with tarfile.open(fileobj=proc.stdout, mode="r|") as tar:
+            tar.extractall(tmp, filter="data")
+        proc.wait()
+
+        api_root = Path(tmp) / src_path
+        if not api_root.exists():
+            api_root = Path(tmp)
+
+        try:
+            return get_public_api(api_root)
+        except Exception as exc:
+            raise SurfaceError(f"Failed to extract public API from index: {exc}") from exc
+
+
+def has_python_changes_index(repo: Repo) -> bool:
+    """Return True if any ``.py`` files differ between HEAD and the staging area.
+
+    Compares the current HEAD commit against the git index (staging area).
+    If the repository has no HEAD commit (initial commit edge case), returns
+    ``True`` to conservatively assume changes exist.
+
+    Args:
+        repo: The git repository to inspect.
+
+    Returns:
+        ``True`` if at least one ``.py`` file appears in the diff between HEAD
+        and the index, or if no HEAD commit exists. ``False`` otherwise.
+    """
+    try:
+        diffs = repo.head.commit.diff(index=True)
+    except ValueError:  # repo.head.commit raises ValueError when HEAD is unborn (initial commit)
+        return True
     for d in diffs:
         a_path: str = d.a_path or ""
         b_path: str = d.b_path or ""

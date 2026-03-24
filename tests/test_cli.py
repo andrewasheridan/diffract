@@ -316,7 +316,7 @@ class TestValidateMsgFile:
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("feat: add thing\n", encoding="utf-8")
         result = _make_result(CommitType.feat, addition_diff)
-        mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
         monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
         with pytest.raises(SystemExit) as exc_info:
             main()
@@ -332,7 +332,7 @@ class TestValidateMsgFile:
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("feat!: remove thing\n", encoding="utf-8")
         result = _make_result(CommitType.feat_breaking, removal_diff)
-        mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
         monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
         with pytest.raises(SystemExit) as exc_info:
             main()
@@ -348,7 +348,7 @@ class TestValidateMsgFile:
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("fix: correct bug\n", encoding="utf-8")
         result = _make_result(CommitType.fix, empty_diff)
-        mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
         monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
         with pytest.raises(SystemExit) as exc_info:
             main()
@@ -364,7 +364,7 @@ class TestValidateMsgFile:
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("refactor: restructure\n", encoding="utf-8")
         result = _make_result(CommitType.refactor, empty_diff)
-        mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
         monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
         with pytest.raises(SystemExit) as exc_info:
             main()
@@ -380,7 +380,7 @@ class TestValidateMsgFile:
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("fix: tiny change\n", encoding="utf-8")
         result = _make_result(CommitType.feat, addition_diff)
-        mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
         monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
         with pytest.raises(SystemExit) as exc_info:
             main()
@@ -397,7 +397,7 @@ class TestValidateMsgFile:
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("fix: tiny change\n", encoding="utf-8")
         result = _make_result(CommitType.feat, addition_diff)
-        mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
         monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
         with pytest.raises(SystemExit) as exc_info:
             main()
@@ -417,7 +417,7 @@ class TestValidateMsgFile:
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("fix: thing\n", encoding="utf-8")
         result = _make_result(CommitType.feat, addition_diff)
-        mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
         monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
         with pytest.raises(SystemExit):
             main()
@@ -435,7 +435,7 @@ class TestValidateMsgFile:
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("fix: thing\n", encoding="utf-8")
         result = _make_result(CommitType.feat, addition_diff)
-        mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
         monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
         with pytest.raises(SystemExit):
             main()
@@ -452,7 +452,7 @@ class TestValidateMsgFile:
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("docs: update readme\n", encoding="utf-8")
         result = _make_result(CommitType.fix, empty_diff)
-        mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
         monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
         with pytest.raises(SystemExit) as exc_info:
             main()
@@ -468,7 +468,7 @@ class TestValidateMsgFile:
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("chore: bump deps\n", encoding="utf-8")
         result = _make_result(CommitType.fix, empty_diff)
-        mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
         monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
         with pytest.raises(SystemExit) as exc_info:
             main()
@@ -484,7 +484,7 @@ class TestValidateMsgFile:
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("", encoding="utf-8")
         result = _make_result(CommitType.fix, empty_diff)
-        mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
         monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
         with pytest.raises(SystemExit) as exc_info:
             main()
@@ -500,7 +500,7 @@ class TestValidateMsgFile:
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("\n\n  \n", encoding="utf-8")
         result = _make_result(CommitType.fix, empty_diff)
-        mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
         monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
         with pytest.raises(SystemExit) as exc_info:
             main()
@@ -516,7 +516,7 @@ class TestValidateMsgFile:
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("feat: add\n\nThis is the body", encoding="utf-8")
         result = _make_result(CommitType.feat, addition_diff)
-        mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
         monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
         with pytest.raises(SystemExit) as exc_info:
             main()
@@ -532,7 +532,7 @@ class TestValidateMsgFile:
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("feat(api)!: remove Bar\n", encoding="utf-8")
         result = _make_result(CommitType.feat_breaking, removal_diff)
-        mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
         monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
         with pytest.raises(SystemExit) as exc_info:
             main()
@@ -548,7 +548,7 @@ class TestValidateMsgFile:
     ) -> None:
         missing = tmp_path / "no_such_file.txt"
         result = _make_result(CommitType.fix, empty_diff)
-        mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
         monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(missing)])
         with pytest.raises(SystemExit) as exc_info:
             main()
@@ -616,7 +616,7 @@ class TestScopedValidateMsgFile:
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("fix(parser): correct something\n", encoding="utf-8")
         result = _make_result(CommitType.feat, addition_diff)
-        mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
         monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
         with pytest.raises(SystemExit) as exc_info:
             main()
@@ -637,7 +637,7 @@ class TestScopedValidateMsgFile:
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("fix(api): nothing\n", encoding="utf-8")
         result = _make_result(CommitType.feat, addition_diff)
-        mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
         monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
         with pytest.raises(SystemExit) as exc_info:
             main()
@@ -657,7 +657,7 @@ class TestScopedValidateMsgFile:
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("fix(core): correct something\n", encoding="utf-8")
         result = _make_result(CommitType.feat_breaking, removal_diff)
-        mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
         monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
         with pytest.raises(SystemExit) as exc_info:
             main()
@@ -677,7 +677,7 @@ class TestScopedValidateMsgFile:
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("feat(completely-irrelevant-scope): add\n", encoding="utf-8")
         result = _make_result(CommitType.feat, addition_diff)
-        mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
         monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
         with pytest.raises(SystemExit) as exc_info:
             main()
@@ -694,8 +694,134 @@ class TestScopedValidateMsgFile:
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("fix(scope): patch something\n", encoding="utf-8")
         result = _make_result(CommitType.fix, empty_diff)
-        mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
         monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
         with pytest.raises(SystemExit) as exc_info:
             main()
         assert exc_info.value.code == 0
+
+
+class TestValidateMsgFileRouting:
+    """Tests for check_staged vs check routing in main() when --validate-msg-file is used."""
+
+    def test_validate_msg_file_without_refs_calls_check_staged(
+        self,
+        tmp_path: Path,
+        addition_diff: ApiDiff,
+        monkeypatch: pytest.MonkeyPatch,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        msg_file = tmp_path / "COMMIT_EDITMSG"
+        msg_file.write_text("feat: add thing\n", encoding="utf-8")
+        result = _make_result(CommitType.feat, addition_diff)
+        mock_check_staged = mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
+        mock_check = mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
+        with pytest.raises(SystemExit):
+            main()
+        mock_check_staged.assert_called_once()
+        mock_check.assert_not_called()
+
+    def test_validate_msg_file_with_explicit_refs_calls_check(
+        self,
+        tmp_path: Path,
+        addition_diff: ApiDiff,
+        monkeypatch: pytest.MonkeyPatch,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        msg_file = tmp_path / "COMMIT_EDITMSG"
+        msg_file.write_text("feat: add thing\n", encoding="utf-8")
+        result = _make_result(CommitType.feat, addition_diff, base_ref="HEAD~2", head_ref="HEAD")
+        mock_check_staged = mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
+        mock_check = mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["diffract", "HEAD~2", "HEAD", "--validate-msg-file", str(msg_file)],
+        )
+        with pytest.raises(SystemExit):
+            main()
+        mock_check.assert_called_once()
+        mock_check_staged.assert_not_called()
+
+    def test_validate_msg_file_with_explicit_refs_passes_refs_to_check(
+        self,
+        tmp_path: Path,
+        addition_diff: ApiDiff,
+        monkeypatch: pytest.MonkeyPatch,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        msg_file = tmp_path / "COMMIT_EDITMSG"
+        msg_file.write_text("feat: add thing\n", encoding="utf-8")
+        result = _make_result(CommitType.feat, addition_diff, base_ref="HEAD~2", head_ref="HEAD")
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
+        mock_check = mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["diffract", "HEAD~2", "HEAD", "--validate-msg-file", str(msg_file)],
+        )
+        with pytest.raises(SystemExit):
+            main()
+        kwargs = mock_check.call_args.kwargs
+        assert kwargs["base_ref"] == "HEAD~2"
+        assert kwargs["head_ref"] == "HEAD"
+
+    def test_no_validate_msg_file_calls_check_with_default_refs(
+        self,
+        empty_diff: ApiDiff,
+        monkeypatch: pytest.MonkeyPatch,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        result = _make_result(CommitType.fix, empty_diff)
+        mock_check_staged = mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
+        mock_check = mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        monkeypatch.setattr(sys, "argv", ["diffract"])
+        with pytest.raises(SystemExit):
+            main()
+        mock_check.assert_called_once()
+        mock_check_staged.assert_not_called()
+        kwargs = mock_check.call_args.kwargs
+        assert kwargs["base_ref"] == "HEAD~1"
+        assert kwargs["head_ref"] == "HEAD"
+
+    def test_no_validate_msg_file_with_custom_refs(
+        self,
+        empty_diff: ApiDiff,
+        monkeypatch: pytest.MonkeyPatch,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        result = _make_result(CommitType.fix, empty_diff, base_ref="v1.0", head_ref="v2.0")
+        mock_check = mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
+        monkeypatch.setattr(sys, "argv", ["diffract", "v1.0", "v2.0"])
+        with pytest.raises(SystemExit):
+            main()
+        mock_check.assert_called_once()
+        kwargs = mock_check.call_args.kwargs
+        assert kwargs["base_ref"] == "v1.0"
+        assert kwargs["head_ref"] == "v2.0"
+
+    def test_validate_msg_file_only_base_ref_given_calls_check(
+        self,
+        tmp_path: Path,
+        empty_diff: ApiDiff,
+        monkeypatch: pytest.MonkeyPatch,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        msg_file = tmp_path / "COMMIT_EDITMSG"
+        msg_file.write_text("fix: patch\n", encoding="utf-8")
+        result = _make_result(CommitType.fix, empty_diff)
+        mock_check_staged = mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
+        mock_check = mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        # Only one positional ref — head_ref will be None, but base_ref is set,
+        # so the condition (base_ref is None AND head_ref is None) is False.
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["diffract", "HEAD~3", "--validate-msg-file", str(msg_file)],
+        )
+        with pytest.raises(SystemExit):
+            main()
+        mock_check.assert_called_once()
+        mock_check_staged.assert_not_called()
