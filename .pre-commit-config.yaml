@@ -7,9 +7,14 @@ repos:
       - id: ruff-format
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.10.0
+    rev: v1.19.1
     hooks:
       - id: mypy
         args: [--strict]
         files: ^src/
         additional_dependencies: [gitpython, sheridan-iceberg]
+
+  - repo: https://github.com/andrewasheridan/diffract
+    rev: b2a7bf95ecca26eef6be4fd3079eac28cfe2f63a
+    hooks:
+      - id: diffract-validate
