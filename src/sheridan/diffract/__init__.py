@@ -13,15 +13,14 @@ __all__ = [
     "NameChange",
     "SurfaceError",
     "__version__",
-    "bar",
     "check",
-    "foo",
+    "check_staged",
     "load_config",
 ]
 
 import importlib.metadata
 
-from sheridan.diffract.checker import check
+from sheridan.diffract.checker import check, check_staged
 from sheridan.diffract.config import DiffractConfig, load_config
 from sheridan.diffract.enums import ChangeKind, CommitType
 from sheridan.diffract.exceptions import DiffractError, GitError, SurfaceError
@@ -31,11 +30,3 @@ try:
     __version__: str = importlib.metadata.version("sheridan-diffract")
 except importlib.metadata.PackageNotFoundError:
     __version__ = "0.0.0+unknown"
-
-
-def foo() -> None:
-    return None
-
-
-def bar() -> None:
-    return None

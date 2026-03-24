@@ -27,8 +27,8 @@ src/sheridan/diffract/
 ├── models.py        # NameChange, ApiDiff, DiffractResult (frozen dataclasses)
 ├── differ.py        # diff_surfaces() — set-diff two iceberg API surfaces
 ├── classifier.py    # classify() — maps ApiDiff → CommitType + summary
-├── git_utils.py     # get_repo(), get_api_at_ref(), has_python_changes()
-├── checker.py       # check() — orchestrates git → iceberg → diff → classify
+├── git_utils.py     # get_repo(), get_api_at_ref(), has_python_changes(), get_api_at_index(), has_python_changes_index()
+├── checker.py       # check() — orchestrates git → iceberg → diff → classify; check_staged() — HEAD vs index
 ├── config.py        # load_config() — DiffractConfig from diffract.toml / pyproject.toml
 └── cli.py           # argparse CLI: `diffract [BASE] [HEAD] [--src] [--json] [--exit-code] [--validate-msg-file]`
 ```
@@ -118,6 +118,8 @@ diffract [BASE] [HEAD]            # defaults: HEAD~1, HEAD
   --exit-code                     # exit 1 (breaking), 2 (any API change), 0 (no change)
   --validate-msg-file MSGFILE     # validate conventional commit type against detected API change
 ```
+
+When `--validate-msg-file` is used **without** explicit `BASE`/`HEAD` refs (the standard commit-msg hook invocation), diffract automatically compares `HEAD` against the **git staging area** rather than `HEAD~1 → HEAD`. This ensures the hook validates what is actually being committed, not what was committed last. Pass explicit refs to override (e.g. for CI use with `diffract base.sha head.sha --validate-msg-file …`).
 
 ## pre-commit hooks
 

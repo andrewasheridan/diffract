@@ -19,5 +19,5 @@
     pyproject.toml [tool.diffract] rather than hook args.
   language: python
   entry: diffract --validate-msg-file
-  pass_filenames: false
+  pass_filenames: true
   stages: [commit-msg]
