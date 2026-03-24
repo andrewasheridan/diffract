@@ -1,0 +1,24 @@
+[project]
+site_name = "sheridan-diffract"
+site_description = "A short description of your project"
+repo_url = "https://github.com/andrewasheridan/diffract"
+repo_name = "andrewasheridan/diffract"
+docs_dir = "docs"
+site_dir = "site"
+nav = [
+  {"Home" = "index.md"},
+]
+
+[project.theme]
+variant = "classic"
+
+[project.plugins.search]
+
+[project.plugins.mkdocstrings.handlers.python]
+paths = ["src"]
+
+[project.plugins.mkdocstrings.handlers.python.options]
+docstring_style = "google"
+show_source = true
+show_root_heading = true
+members_order = "source"

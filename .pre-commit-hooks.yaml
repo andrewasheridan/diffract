@@ -1,0 +1,35 @@
+# Pre-commit hook definitions for sheridan-diffract.
+#
+# To use these hooks in another project, add the following to your
+# .pre-commit-config.yaml:
+#
+#   repos:
+#     - repo: https://github.com/sheridan/diffract
+#       rev: v<VERSION>
+#       hooks:
+#         - id: diffract            # informational — always exits 0
+#         - id: diffract-breaking   # enforcing  — exits non-zero for API changes
+
+- id: diffract
+  name: diffract (informational)
+  description: >
+    Detect public API changes between the last two commits and print the
+    suggested conventional-commit type (feat!, feat, refactor, fix).
+    Always exits 0 — informational only, never blocks a commit.
+  language: python
+  entry: diffract
+  pass_filenames: false
+  types: [python]
+
+- id: diffract-breaking
+  name: diffract (enforce no undeclared breaking changes)
+  description: >
+    Detect public API changes between the last two commits and exit
+    non-zero when changes are found: exit 1 for breaking changes
+    (feat!), exit 2 for additive changes (feat).
+    Recommended stage: pre-push.
+  language: python
+  entry: diffract --exit-code
+  pass_filenames: false
+  types: [python]
+  stages: [pre-push]
