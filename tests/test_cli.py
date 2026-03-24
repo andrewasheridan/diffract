@@ -8,7 +8,14 @@ from pathlib import Path
 
 import pytest
 
-from sheridan.diffract.cli import _format_human, _parse_commit_type, _resolve_exit_code, main
+from sheridan.diffract.cli import (
+    _extract_scope,
+    _format_commit_type,
+    _format_human,
+    _parse_commit_type,
+    _resolve_exit_code,
+    main,
+)
 from sheridan.diffract.config import DiffractConfig
 from sheridan.diffract.enums import CommitType
 from sheridan.diffract.exceptions import GitError
@@ -547,3 +554,148 @@ class TestValidateMsgFile:
             main()
         assert exc_info.value.code == 3
         assert "cannot read" in capsys.readouterr().err
+
+
+class TestExtractScope:
+    """Unit tests for _extract_scope()."""
+
+    @pytest.mark.parametrize(
+        ("first_line", "expected"),
+        [
+            ("feat: add thing", None),
+            ("feat!: remove thing", None),
+            ("fix: correct bug", None),
+            ("refactor: restructure", None),
+            ("feat(api): add thing", "api"),
+            ("feat(api)!: remove thing", "api"),
+            ("fix(parser): correct bug", "parser"),
+            ("refactor(core): restructure", "core"),
+            ("feat(my-scope): add thing", "my-scope"),
+            ("docs: update readme", None),
+            ("chore: bump deps", None),
+            ("", None),
+            ("just a message", None),
+        ],
+    )
+    def test_extract_scope(self, first_line: str, expected: str | None) -> None:
+        assert _extract_scope(first_line) == expected
+
+
+class TestFormatCommitType:
+    """Unit tests for _format_commit_type()."""
+
+    @pytest.mark.parametrize(
+        ("commit_type", "scope", "expected"),
+        [
+            (CommitType.feat, None, "feat:"),
+            (CommitType.feat_breaking, None, "feat!:"),
+            (CommitType.fix, None, "fix:"),
+            (CommitType.refactor, None, "refactor:"),
+            (CommitType.feat, "api", "feat(api):"),
+            (CommitType.feat_breaking, "api", "feat(api)!:"),
+            (CommitType.fix, "parser", "fix(parser):"),
+            (CommitType.refactor, "core", "refactor(core):"),
+        ],
+    )
+    def test_format_commit_type(self, commit_type: CommitType, scope: str | None, expected: str) -> None:
+        assert _format_commit_type(commit_type, scope) == expected
+
+
+class TestScopedValidateMsgFile:
+    """Tests that scope is preserved in written/suggested commit type output."""
+
+    def test_mismatch_with_scope_shows_scope_in_written_and_detected(
+        self,
+        tmp_path: Path,
+        addition_diff: ApiDiff,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        """fix(parser): mismatch against feat should show fix(parser): and feat(parser): in stderr."""
+        msg_file = tmp_path / "COMMIT_EDITMSG"
+        msg_file.write_text("fix(parser): correct something\n", encoding="utf-8")
+        result = _make_result(CommitType.feat, addition_diff)
+        mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 1
+        err = capsys.readouterr().err
+        assert "fix(parser):" in err
+        assert "feat(parser):" in err
+
+    def test_mismatch_with_scope_suggested_prefix_contains_scope(
+        self,
+        tmp_path: Path,
+        addition_diff: ApiDiff,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        """Suggested commit prefix in _format_human output should include scope."""
+        msg_file = tmp_path / "COMMIT_EDITMSG"
+        msg_file.write_text("fix(api): nothing\n", encoding="utf-8")
+        result = _make_result(CommitType.feat, addition_diff)
+        mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 1
+        err = capsys.readouterr().err
+        assert "feat(api):" in err
+
+    def test_mismatch_breaking_with_scope_shows_bang(
+        self,
+        tmp_path: Path,
+        removal_diff: ApiDiff,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        """fix(core): mismatch against feat! should show feat(core)!: as detected."""
+        msg_file = tmp_path / "COMMIT_EDITMSG"
+        msg_file.write_text("fix(core): correct something\n", encoding="utf-8")
+        result = _make_result(CommitType.feat_breaking, removal_diff)
+        mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 1
+        err = capsys.readouterr().err
+        assert "fix(core):" in err
+        assert "feat(core)!:" in err
+
+    def test_scope_ignored_for_type_classification(
+        self,
+        tmp_path: Path,
+        addition_diff: ApiDiff,
+        monkeypatch: pytest.MonkeyPatch,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        """Regex must not care about scope: feat(any-scope): should still classify as feat."""
+        msg_file = tmp_path / "COMMIT_EDITMSG"
+        msg_file.write_text("feat(completely-irrelevant-scope): add\n", encoding="utf-8")
+        result = _make_result(CommitType.feat, addition_diff)
+        mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 0
+
+    def test_match_with_scope_exits_zero(
+        self,
+        tmp_path: Path,
+        empty_diff: ApiDiff,
+        monkeypatch: pytest.MonkeyPatch,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        """fix(scope): matching fix result should exit 0."""
+        msg_file = tmp_path / "COMMIT_EDITMSG"
+        msg_file.write_text("fix(scope): patch something\n", encoding="utf-8")
+        result = _make_result(CommitType.fix, empty_diff)
+        mocker.patch("sheridan.diffract.cli.check", return_value=result)
+        monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 0

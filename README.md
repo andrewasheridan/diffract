@@ -70,6 +70,12 @@ No public API changes detected.
 Suggested commit prefix: fix:
 ```
 
+Scopes are passed through to the suggestion — if your commit message includes `(parser)`, the suggested prefix will too:
+
+```
+Suggested commit prefix: feat(parser):
+```
+
 ### Python API
 
 ```python
@@ -97,6 +103,14 @@ repos:
     rev: v<VERSION>
     hooks:
       - id: diffract-validate
+```
+
+Scopes are preserved in all output — if you write `fix(parser): …`, the mismatch message will show `fix(parser):` as written and `feat(parser):` as the suggested replacement:
+
+```
+diffract: commit type mismatch
+  written:  fix(parser):
+  detected: feat(parser):
 ```
 
 Non-conventional commit types (`docs:`, `chore:`, `test:`, etc.) are never blocked.
