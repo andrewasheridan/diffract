@@ -13,6 +13,7 @@ __all__ = [
     "NameChange",
     "SurfaceError",
     "__version__",
+    "bar",
     "check",
     "foo",
     "load_config",
@@ -33,4 +34,8 @@ except importlib.metadata.PackageNotFoundError:
 
 
 def foo() -> None:
+    return None
+
+
+def bar() -> None:
     return None
