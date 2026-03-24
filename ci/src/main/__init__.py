@@ -25,6 +25,8 @@ def _base(source: dagger.Directory) -> dagger.Container:
     return (
         dag.container()
         .from_(_PYTHON_IMAGE)
+        .with_exec(["apt-get", "update", "--quiet", "-y"])
+        .with_exec(["apt-get", "install", "--quiet", "-y", "--no-install-recommends", "git"])
         .with_exec(["pip", "install", "--quiet", "uv"])
         .with_mounted_cache("/root/.cache/uv", dag.cache_volume("uv-cache"))
         .with_directory("/src", source)

@@ -29,19 +29,19 @@ pip install sheridan-diffract
 
 ```bash
 # Compare the last two commits (default)
-diffract check
+diffract
 
 # Compare specific refs
-diffract check HEAD~3 HEAD
+diffract HEAD~3 HEAD
 
 # Custom source directory (default: src/)
-diffract check --src lib/
+diffract --src lib/
 
 # Emit JSON for CI consumption
-diffract check --json
+diffract --json
 
 # Exit non-zero if a breaking change is detected (for CI gates)
-diffract check --exit-code
+diffract --exit-code
 ```
 
 **Exit codes with `--exit-code`:**
@@ -70,6 +70,12 @@ No public API changes detected.
 Suggested commit prefix: fix:
 ```
 
+Scopes are passed through to the suggestion — if your commit message includes `(parser)`, the suggested prefix will too:
+
+```
+Suggested commit prefix: feat(parser):
+```
+
 ### Python API
 
 ```python
@@ -86,24 +92,86 @@ import json
 print(json.dumps(result.to_dict(), indent=2))
 ```
 
-### As a pre-push git hook
+### Validate commit messages with pre-commit
 
-Add to `.git/hooks/pre-push` (or manage via pre-commit):
+`diffract` ships a `commit-msg` hook that rejects commits whose conventional commit type doesn't match the detected API change — catching `fix:` when you actually removed a public name.
 
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-diffract check --exit-code
+```yaml
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/sheridan/diffract
+    rev: v<VERSION>
+    hooks:
+      - id: diffract-validate
 ```
+
+Scopes are preserved in all output — if you write `fix(parser): …`, the mismatch message will show `fix(parser):` as written and `feat(parser):` as the suggested replacement:
+
+```
+diffract: commit type mismatch
+  written:  fix(parser):
+  detected: feat(parser):
+```
+
+Non-conventional commit types (`docs:`, `chore:`, `test:`, etc.) are never blocked.
+
+### Configuration
+
+If your source code isn't in `src/`, tell diffract once in a config file rather than repeating it on every command:
+
+**`diffract.toml`** (takes precedence):
+```toml
+src = "python/src"
+```
+
+**`pyproject.toml`**:
+```toml
+[tool.diffract]
+src = "python/src"
+```
+
+Priority: explicit `--src` flag → `diffract.toml` → `pyproject.toml` → default (`src/`).
 
 ### As a GitHub Actions check
 
+Validate the **PR title** against detected API changes — the CI equivalent of the pre-commit hook.
+The refs to diff are the PR branch HEAD versus the target branch HEAD:
+
 ```yaml
-- name: Check API classification
-  run: diffract check --exit-code --json
+# .github/workflows/diffract.yml
+name: diffract
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]  # 'edited' catches title-only changes
+
+jobs:
+  api-change-check:
+    name: Validate PR title against API changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # required to access both commit SHAs
+
+      - name: Install diffract
+        run: pip install sheridan-diffract
+
+      - name: Validate PR title type matches API change
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          printf '%s' "$PR_TITLE" > /tmp/pr-title.txt
+          diffract \
+            ${{ github.event.pull_request.base.sha }} \
+            ${{ github.event.pull_request.head.sha }} \
+            --validate-msg-file /tmp/pr-title.txt
 ```
 
-Fails the build if a breaking change is not flagged as `feat!` in the commit message.
+- `base.sha` — HEAD of the target branch (e.g. `main`) at the time of the PR event
+- `head.sha` — HEAD of the PR branch
+- Non-conventional title prefixes (`docs:`, `chore:`, `test:`, etc.) are never blocked
+- Scopes are passed through: a title of `feat(parser): …` will suggest `feat(parser):` on mismatch
 
 ## What it does not do
 

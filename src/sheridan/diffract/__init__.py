@@ -6,6 +6,7 @@ __all__ = [
     "ApiDiff",
     "ChangeKind",
     "CommitType",
+    "DiffractConfig",
     "DiffractError",
     "DiffractResult",
     "GitError",
@@ -13,11 +14,13 @@ __all__ = [
     "SurfaceError",
     "__version__",
     "check",
+    "load_config",
 ]
 
 import importlib.metadata
 
 from sheridan.diffract.checker import check
+from sheridan.diffract.config import DiffractConfig, load_config
 from sheridan.diffract.enums import ChangeKind, CommitType
 from sheridan.diffract.exceptions import DiffractError, GitError, SurfaceError
 from sheridan.diffract.models import ApiDiff, DiffractResult, NameChange

@@ -29,7 +29,8 @@ src/sheridan/diffract/
 ├── classifier.py    # classify() — maps ApiDiff → CommitType + summary
 ├── git_utils.py     # get_repo(), get_api_at_ref(), has_python_changes()
 ├── checker.py       # check() — orchestrates git → iceberg → diff → classify
-└── cli.py           # argparse CLI: `diffract [BASE] [HEAD] [--json] [--exit-code]`
+├── config.py        # load_config() — DiffractConfig from diffract.toml / pyproject.toml
+└── cli.py           # argparse CLI: `diffract [BASE] [HEAD] [--src] [--json] [--exit-code] [--validate-msg-file]`
 ```
 
 ### Key dependency: sheridan-iceberg
@@ -94,6 +95,43 @@ chore:    maintenance (deps, config, tooling)
 ## Architecture Decision Records
 
 Significant decisions are documented in `docs/decisions/`. Use the `adr` skill to add new ones.
+
+## Configuration
+
+diffract reads `src` from the first config file found in the repo root:
+
+| File | Key |
+|---|---|
+| `diffract.toml` | `src = "python/src"` |
+| `pyproject.toml` | `[tool.diffract]` → `src = "python/src"` |
+
+If neither file is present, `--src` CLI flag is used, falling back to `src/`.
+
+Priority: `--src` flag > `diffract.toml` > `pyproject.toml` > default (`src/`)
+
+## CLI flags
+
+```
+diffract [BASE] [HEAD]            # defaults: HEAD~1, HEAD
+  --src PATH                      # source directory (default: src); use --src . for flat layouts
+  --json                          # output JSON instead of human-readable text
+  --exit-code                     # exit 1 (breaking), 2 (any API change), 0 (no change)
+  --validate-msg-file MSGFILE     # validate conventional commit type against detected API change
+```
+
+## pre-commit hooks
+
+One hook is exported from `.pre-commit-hooks.yaml`:
+
+| Hook id | Stage | Purpose |
+|---|---|---|
+| `diffract-validate` | commit-msg | Fails if the commit message type doesn't match the detected API change |
+
+The hook reads `src` from `diffract.toml` or `pyproject.toml` automatically:
+
+```yaml
+- id: diffract-validate
+```
 
 ## What diffract does NOT do
 

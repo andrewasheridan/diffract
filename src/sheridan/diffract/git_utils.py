@@ -61,7 +61,7 @@ def get_api_at_ref(repo: Repo, ref: str, src_path: str = "src") -> dict[str, lis
 
     with tempfile.TemporaryDirectory() as tmp:
         proc = repo.git.archive(ref, format="tar", as_process=True)
-        with tarfile.open(fileobj=proc.stdout) as tar:
+        with tarfile.open(fileobj=proc.stdout, mode="r|") as tar:
             tar.extractall(tmp, filter="data")
         proc.wait()
 

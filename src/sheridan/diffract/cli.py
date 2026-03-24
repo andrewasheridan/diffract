@@ -6,15 +6,20 @@ __all__ = ["main"]
 
 import argparse
 import json
+import re
 import sys
 from collections import defaultdict
 from pathlib import Path
 
 from sheridan.diffract import __version__
 from sheridan.diffract.checker import check
+from sheridan.diffract.config import load_config
 from sheridan.diffract.enums import CommitType
 from sheridan.diffract.exceptions import DiffractError
+from sheridan.diffract.git_utils import get_repo
 from sheridan.diffract.models import DiffractResult, NameChange
+
+_COMMIT_TYPE_RE: re.Pattern[str] = re.compile(r"^(feat|fix|refactor)(\([^)]*\))?(!)?:")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -48,7 +53,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--src",
-        default="src",
+        default=None,
         metavar="SRC",
         dest="src_path",
         help="Source directory within the repository to scan (default: src).",
@@ -64,6 +69,12 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         dest="exit_code",
         help="Exit 1 for breaking changes, 2 for any API change, 0 otherwise.",
+    )
+    parser.add_argument(
+        "--validate-msg-file",
+        dest="validate_msg_file",
+        metavar="MSGFILE",
+        help="Path to commit message file; validates written type against detected API change.",
     )
 
     return parser
@@ -84,11 +95,14 @@ def _group_changes(changes: tuple[NameChange, ...]) -> dict[str, list[str]]:
     return {mod: sorted(names) for mod, names in sorted(grouped.items())}
 
 
-def _format_human(result: DiffractResult) -> str:
+def _format_human(result: DiffractResult, scope: str | None = None) -> str:
     """Format a DiffractResult as human-readable text.
 
     Args:
         result: The diffract result to format.
+        scope: Optional conventional-commit scope (without parentheses) to
+            include in the suggested commit prefix, e.g. ``"api"`` produces
+            ``"feat(api):"`` instead of ``"feat:"``.
 
     Returns:
         A multi-line string suitable for printing to a terminal.
@@ -121,7 +135,7 @@ def _format_human(result: DiffractResult) -> str:
                     lines.append(f"    + {name}")
 
     lines.append("")
-    lines.append(f"Suggested commit prefix: {commit_label}:")
+    lines.append(f"Suggested commit prefix: {_format_commit_type(result.commit_type, scope)}")
 
     return "\n".join(lines)
 
@@ -146,21 +160,137 @@ def _resolve_exit_code(result: DiffractResult, use_exit_code: bool) -> int:
     return 0
 
 
+def _parse_commit_type(first_line: str) -> CommitType | None:
+    """Parse the conventional commit type from the first line of a commit message.
+
+    Recognises ``feat``, ``feat!``, ``fix``, and ``refactor`` (with or without
+    a scope in parentheses). Any other prefix — including ``docs:``, ``chore:``,
+    ``test:``, etc. — returns ``None`` so that non-conventional commits are
+    never blocked.
+
+    Args:
+        first_line: The first line of the commit message.
+
+    Returns:
+        The matching :class:`~sheridan.diffract.enums.CommitType`, or ``None``
+        if the line does not start with a recognised conventional-commit type.
+    """
+    m = _COMMIT_TYPE_RE.match(first_line)
+    if m is None:
+        return None
+    base, _scope, bang = m.group(1), m.group(2), m.group(3)
+    match (base, bool(bang)):
+        case ("feat", True):
+            return CommitType.feat_breaking
+        case ("feat", False):
+            return CommitType.feat
+        case ("fix", _):
+            return CommitType.fix
+        case ("refactor", _):
+            return CommitType.refactor
+        case _:
+            return None
+
+
+def _extract_scope(first_line: str) -> str | None:
+    """Extract the optional scope from the first line of a commit message.
+
+    Args:
+        first_line: The first line of the commit message.
+
+    Returns:
+        The scope string without parentheses (e.g. ``"parser"`` from
+        ``"feat(parser): …"``), or ``None`` if no scope is present or
+        the line is not a recognised conventional-commit prefix.
+    """
+    m = _COMMIT_TYPE_RE.match(first_line)
+    if m is None:
+        return None
+    raw = m.group(2)  # e.g. "(parser)" or None
+    return raw[1:-1] if raw is not None else None
+
+
+def _format_commit_type(commit_type: CommitType, scope: str | None) -> str:
+    """Render a commit type with an optional scope as a conventional-commit prefix.
+
+    Args:
+        commit_type: The commit type to render.
+        scope: An optional scope string (without parentheses).
+
+    Returns:
+        A string such as ``"feat:"``, ``"feat(api):"`` or ``"feat(api)!:"``.
+    """
+    if scope is None:
+        return f"{commit_type}:"
+    if commit_type == CommitType.feat_breaking:
+        return f"feat({scope})!:"
+    return f"{commit_type}({scope}):"
+
+
 def main() -> None:
-    """CLI entrypoint for diffract."""
+    """CLI entrypoint for diffract.
+
+    Loads configuration from config files (if present), parses command-line arguments,
+    and invokes the check() function to detect API changes. Outputs results as
+    human-readable text or JSON, and optionally validates commit message types.
+
+    Exits with code:
+      - 0: No changes detected (or --exit-code not set)
+      - 1: Breaking changes detected (with --exit-code), or commit message mismatch
+      - 2: Non-breaking API changes detected (with --exit-code)
+      - 3: Error during processing (git, file I/O, or surface detection)
+    """
     parser = _build_parser()
     args = parser.parse_args()
+
+    repo_path = Path.cwd()
+    # Resolve the actual git repo root so load_config finds config files
+    # correctly even when diffract is invoked from a subdirectory.
+    try:
+        repo_root = Path(get_repo(repo_path).working_dir)
+    except DiffractError:
+        repo_root = repo_path  # no repo found; check() will raise the proper error
+    config = load_config(repo_root)
+    # Priority: --src flag > config file > built-in default
+    src_path: str = args.src_path or config.src or "src"
 
     try:
         result = check(
             base_ref=args.base_ref,
             head_ref=args.head_ref,
-            repo_path=Path.cwd(),
-            src_path=args.src_path,
+            repo_path=repo_path,
+            src_path=src_path,
         )
     except DiffractError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(3)
+
+    if args.validate_msg_file is not None:
+        msg_path = Path(args.validate_msg_file)
+        try:
+            raw = msg_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            print(f"diffract: cannot read commit message file: {exc}", file=sys.stderr)
+            sys.exit(3)
+
+        _lines = raw.splitlines()
+        first_line = _lines[0] if _lines else ""
+        written_type = _parse_commit_type(first_line)
+        scope = _extract_scope(first_line)
+
+        if written_type is None:
+            sys.exit(0)
+        if written_type == result.commit_type:
+            sys.exit(0)
+
+        print(_format_human(result, scope=scope), file=sys.stderr)
+        print(
+            f"\ndiffract: commit type mismatch"
+            f"\n  written:  {_format_commit_type(written_type, scope)}"
+            f"\n  detected: {_format_commit_type(result.commit_type, scope)}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     if args.output_json:
         print(json.dumps(result.to_dict(), indent=2))
