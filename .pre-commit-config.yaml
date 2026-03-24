@@ -18,3 +18,4 @@ repos:
     rev: b2a7bf95ecca26eef6be4fd3079eac28cfe2f63a
     hooks:
       - id: diffract-validate
+        stages: [commit-msg]
