@@ -29,19 +29,19 @@ pip install sheridan-diffract
 
 ```bash
 # Compare the last two commits (default)
-diffract check
+diffract
 
 # Compare specific refs
-diffract check HEAD~3 HEAD
+diffract HEAD~3 HEAD
 
 # Custom source directory (default: src/)
-diffract check --src lib/
+diffract --src lib/
 
 # Emit JSON for CI consumption
-diffract check --json
+diffract --json
 
 # Exit non-zero if a breaking change is detected (for CI gates)
-diffract check --exit-code
+diffract --exit-code
 ```
 
 **Exit codes with `--exit-code`:**
@@ -86,21 +86,43 @@ import json
 print(json.dumps(result.to_dict(), indent=2))
 ```
 
-### As a pre-push git hook
+### Validate commit messages with pre-commit
 
-Add to `.git/hooks/pre-push` (or manage via pre-commit):
+`diffract` ships a `commit-msg` hook that rejects commits whose conventional commit type doesn't match the detected API change — catching `fix:` when you actually removed a public name.
 
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-diffract check --exit-code
+```yaml
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/sheridan/diffract
+    rev: v<VERSION>
+    hooks:
+      - id: diffract-validate
 ```
+
+Non-conventional commit types (`docs:`, `chore:`, `test:`, etc.) are never blocked.
+
+### Configuration
+
+If your source code isn't in `src/`, tell diffract once in a config file rather than repeating it on every command:
+
+**`diffract.toml`** (takes precedence):
+```toml
+src = "python/src"
+```
+
+**`pyproject.toml`**:
+```toml
+[tool.diffract]
+src = "python/src"
+```
+
+Priority: explicit `--src` flag → `diffract.toml` → `pyproject.toml` → default (`src/`).
 
 ### As a GitHub Actions check
 
 ```yaml
 - name: Check API classification
-  run: diffract check --exit-code --json
+  run: diffract --exit-code --json
 ```
 
 Fails the build if a breaking change is not flagged as `feat!` in the commit message.
