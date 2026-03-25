@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sheridan-diffract"
-version = "1.0.0"
+version = "1.0.1"
 description = "A short description of your project"
 readme = "README.md"
 license = { text = "MIT" }
@@ -118,7 +118,7 @@ exclude_also = [
 # ---------------------------------------------------------------------------
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "1.0.0"
+version = "1.0.1"
 version_files = [
     "pyproject.toml:^version",
     ".pre-commit-config.yaml:rev: v.*# diffract",
