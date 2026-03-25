@@ -13,11 +13,11 @@ jobs:
       !startsWith(github.event.head_commit.message, 'bump:') &&
       !startsWith(github.head_ref, 'chore/version-bump-')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Restore Dagger engine cache
         id: cache-dagger
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: /tmp/dagger-engine.tar
           key: dagger-engine-v0.20.3
