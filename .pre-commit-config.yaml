@@ -14,12 +14,7 @@ repos:
         files: ^src/
         additional_dependencies: [gitpython, sheridan-iceberg]
 
-  - repo: local
-    # rev: v1.0.0  # diffract
+  - repo: https://github.com/andrewasheridan/diffract
+    rev: v1.0.0  # diffract
     hooks:
       - id: diffract-validate
-        name: diffract (validate commit message type)
-        language: python
-        entry: diffract --validate-msg-file
-        pass_filenames: true
-        stages: [commit-msg]
