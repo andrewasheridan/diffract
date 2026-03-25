@@ -32,6 +32,7 @@ jobs:
           version: "0.20.3"
           cmds: |
             call check --source=.
+          cleanup: false
 
       - name: Save Dagger engine image
         if: steps.cache-dagger.outputs.cache-hit != 'true'
