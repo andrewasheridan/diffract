@@ -161,7 +161,7 @@ def has_python_changes_index(repo: Repo) -> bool:
         and the index, or if no HEAD commit exists. ``False`` otherwise.
     """
     try:
-        diffs = repo.head.commit.diff(index=True)
+        diffs = repo.index.diff(repo.head.commit)
     except ValueError:  # repo.head.commit raises ValueError when HEAD is unborn (initial commit)
         return True
     for d in diffs:
