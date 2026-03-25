@@ -27,7 +27,7 @@ jobs:
         run: docker load -i /tmp/dagger-engine.tar
 
       - name: Run CI pipeline
-        uses: dagger/dagger-action@v8
+        uses: dagger/dagger-for-github@v8.4.0
         with:
           version: "0.20.3"
           call: check --source=.
