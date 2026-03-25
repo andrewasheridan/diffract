@@ -92,6 +92,10 @@ test:     add or update tests
 chore:    maintenance (deps, config, tooling)
 ```
 
+## GitHub Actions workflows
+
+Workflow files live in `.github/workflows/` and use the **`.yaml` extension** (not `.yml`).
+
 ## Architecture Decision Records
 
 Significant decisions are documented in `docs/decisions/`. Use the `adr` skill to add new ones.

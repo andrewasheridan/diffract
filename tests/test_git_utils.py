@@ -266,18 +266,18 @@ class TestHasPythonChangesIndex:
     def test_returns_true_when_py_file_in_index_diff(self) -> None:
         repo = MagicMock()
         diff_item = self._diff_item("module.py", "module.py")
-        repo.head.commit.diff.return_value = [diff_item]
+        repo.index.diff.return_value = [diff_item]
         assert has_python_changes_index(repo) is True
 
     def test_returns_false_when_only_non_py_files_in_index_diff(self) -> None:
         repo = MagicMock()
         diff_item = self._diff_item("README.md", "README.md")
-        repo.head.commit.diff.return_value = [diff_item]
+        repo.index.diff.return_value = [diff_item]
         assert has_python_changes_index(repo) is False
 
     def test_returns_false_when_index_diff_is_empty(self) -> None:
         repo = MagicMock()
-        repo.head.commit.diff.return_value = []
+        repo.index.diff.return_value = []
         assert has_python_changes_index(repo) is False
 
     def test_returns_true_on_initial_commit(self) -> None:
@@ -289,11 +289,11 @@ class TestHasPythonChangesIndex:
     def test_detects_py_change_via_b_path(self) -> None:
         repo = MagicMock()
         diff_item = self._diff_item("", "new_module.py")
-        repo.head.commit.diff.return_value = [diff_item]
+        repo.index.diff.return_value = [diff_item]
         assert has_python_changes_index(repo) is True
 
-    def test_diff_called_with_index_true(self) -> None:
+    def test_diff_called_with_head_commit(self) -> None:
         repo = MagicMock()
-        repo.head.commit.diff.return_value = []
+        repo.index.diff.return_value = []
         has_python_changes_index(repo)
-        repo.head.commit.diff.assert_called_once_with(index=True)
+        repo.index.diff.assert_called_once_with(repo.head.commit)
