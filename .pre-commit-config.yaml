@@ -15,6 +15,6 @@ repos:
         additional_dependencies: [gitpython, sheridan-iceberg]
 
   - repo: https://github.com/andrewasheridan/diffract
-    rev: b2a7bf95ecca26eef6be4fd3079eac28cfe2f63a
+    rev: v0.1.0  # diffract
     hooks:
       - id: diffract-validate
