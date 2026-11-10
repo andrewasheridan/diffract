@@ -9,19 +9,41 @@ from enum import StrEnum
 
 
 class CommitType(StrEnum):
-    """The Conventional Commit type that diffract gives.
+    """The group of Conventional Commit types that diffract gives.
+
+    diffract compares only the public names and the changed files. Thus it cannot
+    always find one type. For example, it cannot tell a fix from a refactor. It gives
+    the group of types that are possible for the change.
 
     Attributes:
-        feat: A public name was added, and no public name was removed.
         feat_breaking: A public name was removed. This is a breaking change.
-        fix: The public API did not change, and no Python file changed.
-        refactor: Python files changed, but the public API did not change.
+        feat: A public name was added, and no public name was removed.
+        code: No public name changed, but Python files in the source directory changed.
+        test: No public name changed, and only Python files in the test directory
+            changed.
+        other: No public name changed, and no Python file in the source directory or
+            in the test directory changed.
     """
 
-    feat = "feat"
     feat_breaking = "feat!"
-    fix = "fix"
-    refactor = "refactor"
+    feat = "feat"
+    code = "code"
+    test = "test"
+    other = "other"
+
+    @property
+    def possible_types(self) -> tuple[str, ...]:
+        """The Conventional Commit types that are possible for this group."""
+        return _POSSIBLE_TYPES[self]
+
+
+_POSSIBLE_TYPES: dict[CommitType, tuple[str, ...]] = {
+    CommitType.feat_breaking: ("feat!",),
+    CommitType.feat: ("feat",),
+    CommitType.code: ("fix", "refactor", "perf", "style"),
+    CommitType.test: ("test",),
+    CommitType.other: ("docs", "ci", "chore", "build"),
+}
 
 
 class ChangeKind(StrEnum):

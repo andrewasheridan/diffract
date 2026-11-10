@@ -55,7 +55,8 @@ class DiffractResult:
     """All the output of a diffract check.
 
     Attributes:
-        commit_type: The Conventional Commit type that diffract gives for the diff.
+        commit_type: The group of Conventional Commit types that diffract gives for
+            the diff. ``commit_type.possible_types`` gives the types in the group.
         summary: A short description of the changes.
         diff: The full API diff between base and head.
         base_ref: The earlier git ref of the comparison.
@@ -72,12 +73,15 @@ class DiffractResult:
         """Convert this result to a dict that ``json.dumps`` can write.
 
         Returns:
-            A dict with the keys ``commit_type``, ``summary``, ``base_ref``,
-            ``head_ref`` and ``diff``. ``diff`` has the keys ``added`` and
-            ``removed``. Each is a list of ``{"module": ..., "name": ...}`` dicts.
+            A dict with the keys ``group``, ``possible_types``, ``summary``,
+            ``base_ref``, ``head_ref`` and ``diff``. ``group`` is the value of
+            ``commit_type``. ``possible_types`` is a list of the types in that group.
+            ``diff`` has the keys ``added`` and ``removed``. Each is a list of
+            ``{"module": ..., "name": ...}`` dicts.
         """
         return {
-            "commit_type": str(self.commit_type),
+            "group": str(self.commit_type),
+            "possible_types": list(self.commit_type.possible_types),
             "summary": self.summary,
             "base_ref": self.base_ref,
             "head_ref": self.head_ref,

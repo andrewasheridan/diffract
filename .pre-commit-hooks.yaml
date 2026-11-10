@@ -15,8 +15,8 @@
     Checks that the commit message tells the API change that diffract finds.
     Removed public names need a '!' or a 'BREAKING CHANGE:' footer. Added
     public names need 'feat' or a '!'. Exits 1 if the message tells less.
-    Types other than feat, fix and refactor are never blocked. Configure the source directory via diffract.toml or
-    pyproject.toml [tool.diffract] rather than hook args.
+    Types other than feat, fix and refactor are never blocked. Set the source and test directories in diffract.toml or
+    pyproject.toml [tool.diffract], not in the hook args.
   language: python
   entry: diffract --validate-msg-file
   pass_filenames: true

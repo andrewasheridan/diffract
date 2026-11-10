@@ -3,14 +3,15 @@
 __all__ = [
     "get_api_at_index",
     "get_api_at_ref",
+    "get_changed_paths",
+    "get_changed_paths_index",
     "get_repo",
     "has_python_changes",
-    "has_python_changes_index",
 ]
 
 import tarfile
 import tempfile
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from pathlib import Path, PurePosixPath
 
 from git import BadName, GitCommandError, InvalidGitRepositoryError, Repo
@@ -78,23 +79,46 @@ def _read_api(api_root: Path) -> dict[str, list[str]]:
 _PYTHON_SUFFIXES = (".py", ".pyi")
 
 
-def _is_python_in(path: str, src_path: str) -> bool:
-    """Find if ``path`` is a ``.py`` or ``.pyi`` file under ``src_path``.
+def _is_in(path: str, directory: str) -> bool:
+    """Find if ``path`` is in ``directory``.
 
     Args:
         path: A path relative to the repository root, as git shows it.
-        src_path: The source directory relative to the repository root. ``"."`` is the root.
+        directory: A directory relative to the repository root. ``"."`` is the root.
 
     Returns:
-        ``True`` if ``path`` ends with ``.py`` or ``.pyi`` and is in ``src_path``.
+        ``True`` if ``path`` is in ``directory`` or in one of its subdirectories.
         ``False`` if not.
     """
-    if not path.endswith(_PYTHON_SUFFIXES):
-        return False
-
-    src_parts = PurePosixPath(src_path).parts
+    dir_parts = PurePosixPath(directory).parts
     path_parts = PurePosixPath(path).parts
-    return path_parts[: len(src_parts)] == src_parts
+    return path_parts[: len(dir_parts)] == dir_parts
+
+
+def has_python_changes(paths: Iterable[str], directory: str, exclude: str | None = None) -> bool:
+    """Find if one of ``paths`` is a ``.py`` or ``.pyi`` file in ``directory``.
+
+    Use ``exclude`` when the test directory is in the source directory, for example
+    ``src/pkg/tests``. Then a change to a test file does not count as a code change.
+
+    Args:
+        paths: The changed paths, relative to the repository root, as git shows them.
+        directory: The directory to find changes in. ``"."`` is the repository root.
+        exclude: A directory in which a changed file does not count, or ``None``.
+
+    Returns:
+        ``True`` if one or more paths end with ``.py`` or ``.pyi``, are in
+        ``directory`` and are not in ``exclude``. ``False`` if not.
+    """
+    for path in paths:
+        if not path.endswith(_PYTHON_SUFFIXES):
+            continue
+        if exclude is not None and _is_in(path, exclude):
+            continue
+        if _is_in(path, directory):
+            return True
+
+    return False
 
 
 def _extract_src(repo: Repo, treeish: str, src_path: str, dest: Path) -> Path | None:
@@ -195,33 +219,27 @@ def get_api_at_ref(repo: Repo, ref: str, src_path: str = "src") -> dict[str, lis
             raise SurfaceError(f"Cannot extract the public API at ref {ref!r}: {exc}") from exc
 
 
-def has_python_changes(repo: Repo, base_ref: str, head_ref: str, src_path: str = "src") -> bool:
-    """Find if a ``.py`` or ``.pyi`` file in ``src_path`` changed between the two refs.
+def get_changed_paths(repo: Repo, base_ref: str, head_ref: str) -> list[str]:
+    """Get the paths of the files that changed between the two refs.
 
-    A ``.py`` or ``.pyi`` file outside ``src_path`` (for example in ``tests/``) is not
-    package code. Thus it does not count. A renamed file counts if its old path or its
-    new path is in ``src_path``.
+    For a renamed file, the list has the old path and the new path.
 
     Args:
         repo: The git repository.
         base_ref: The earlier git ref.
         head_ref: The later git ref.
-        src_path: The directory in the repository that contains the Python packages.
 
     Returns:
-        ``True`` if one or more ``.py`` or ``.pyi`` files in ``src_path`` are in the
-        diff. ``False`` if not.
+        The changed paths, relative to the repository root.
     """
     base_commit = repo.commit(base_ref)
     head_commit = repo.commit(head_ref)
 
+    paths: list[str] = []
     for d in base_commit.diff(head_commit):
-        a_path: str = d.a_path or ""
-        b_path: str = d.b_path or ""
-        if _is_python_in(a_path, src_path) or _is_python_in(b_path, src_path):
-            return True
+        paths.extend(path for path in (d.a_path, d.b_path) if path)
 
-    return False
+    return paths
 
 
 def get_api_at_index(repo: Repo, src_path: str = "src") -> dict[str, list[str]] | None:
@@ -263,27 +281,24 @@ def get_api_at_index(repo: Repo, src_path: str = "src") -> dict[str, list[str]] 
             raise SurfaceError(f"Cannot extract the public API from the staging area: {exc}") from exc
 
 
-def has_python_changes_index(repo: Repo, src_path: str = "src") -> bool:
-    """Find if a ``.py`` or ``.pyi`` file in ``src_path`` changed between HEAD and the index.
+def get_changed_paths_index(repo: Repo) -> list[str]:
+    """Get the paths of the files that changed between HEAD and the staging area.
 
-    The function compares the HEAD commit with the staging area (the index). It uses
-    ``git diff --cached``, which obeys ``GIT_INDEX_FILE`` (see ``get_api_at_index``).
-    A ``.py`` or ``.pyi`` file outside ``src_path`` does not count. Before the first
-    commit, the repository has no HEAD commit. Then the function gives ``True``, because
-    all the files are new.
+    The function uses ``git diff --cached``, which obeys ``GIT_INDEX_FILE`` (see
+    ``get_api_at_index``). Before the first commit, the repository has no HEAD commit.
+    Then all the files in the staging area are new, and the function gives all of them.
 
     Args:
         repo: The git repository.
-        src_path: The directory in the repository that contains the Python packages.
 
     Returns:
-        ``True`` if one or more ``.py`` or ``.pyi`` files in ``src_path`` are in the
-        diff between HEAD and the index, or if there is no HEAD commit. ``False`` if not.
+        The changed paths, relative to the repository root.
     """
     if not repo.head.is_valid():
-        return True
+        output: str = repo.git.ls_files()
+        return output.splitlines()
 
     # With --no-renames, git shows a renamed file as a deletion of the old path and an
-    # addition of the new path. Thus the file counts if one of the two is in src_path.
-    output: str = repo.git.diff("--cached", "--name-only", "--no-renames", "HEAD")
-    return any(_is_python_in(path, src_path) for path in output.splitlines())
+    # addition of the new path. Thus the list has the two paths.
+    output = repo.git.diff("--cached", "--name-only", "--no-renames", "HEAD")
+    return output.splitlines()

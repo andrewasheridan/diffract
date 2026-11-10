@@ -9,7 +9,10 @@ diffract v1.2.0 HEAD --json
 
 ```json
 {
-  "commit_type": "feat!",
+  "group": "feat!",
+  "possible_types": [
+    "feat!"
+  ],
   "summary": "Breaking change. Removed public names: sheridan.diffract: OldHelper",
   "base_ref": "v1.2.0",
   "head_ref": "HEAD",
@@ -29,7 +32,8 @@ diffract v1.2.0 HEAD --json
 
 | Key | Type | Description |
 |---|---|---|
-| `commit_type` | string | `feat!`, `feat`, `refactor` or `fix`. |
+| `group` | string | The group of possible types: `feat!`, `feat`, `code`, `test` or `other`. Read [Getting started](getting-started.md#how-diffract-gives-the-commit-types). |
+| `possible_types` | list | The Conventional Commit types in the group, for example `["fix", "refactor", "perf", "style"]` for `code`. |
 | `summary` | string | A description of the change for people. Do not parse it. |
 | `base_ref` | string | The earlier ref, as you gave it. |
 | `head_ref` | string | The later ref, as you gave it. For the staging area, the value is `:staged`. |
@@ -44,5 +48,5 @@ diffract v1.2.0 HEAD --json
 ## Read the output in a script
 
 ```bash
-commit_type=$(diffract --json | jq -r .commit_type)
+group=$(diffract --json | jq -r .group)
 ```

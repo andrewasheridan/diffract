@@ -1,7 +1,8 @@
 # CLAUDE.md
 
 diffract (`sheridan-diffract` on PyPI) finds how the public API of a Python package
-changed between two git refs. It gives the Conventional Commit type for that change. It
+changed between two git refs. It gives the group of Conventional Commit types that are
+possible for that change. It
 does not read the AST itself: `sheridan-iceberg` extracts the public API.
 
 ## Check command
@@ -16,22 +17,29 @@ Run `task check` before you say that a change is done. It runs these gates:
 The code is in `src/sheridan/diffract/`. `checker.py` connects the steps:
 
 1. Git: `git_utils.py` uses `git archive` to write only the source directory of a ref (or
-   of the staging area) to a temporary directory. It also finds if `.py` or `.pyi` files in the source directory changed.
+   of the staging area) to a temporary directory. It also gives the paths of the changed
+   files. `has_python_changes` finds if `.py` or `.pyi` files in a directory changed.
 2. Extract: `git_utils.py` calls `sheridan.iceberg.get_public_api` on each tree to get
    the public names.
 3. Diff: `differ.py` compares the two sets of names and makes an `ApiDiff`.
-4. Classify: `classifier.py` gives the commit type, in this order of priority:
+4. Classify: `classifier.py` gives the group of possible types (`CommitType`), in this
+   order of priority:
    - a public name was removed: `feat!`
    - a public name was added: `feat`
-   - no name changed, but `.py` or `.pyi` files in the source directory changed: `refactor`
-   - no change: `fix`
+   - `.py` or `.pyi` files in the source directory changed: `code` (`fix`, `refactor`,
+     `perf`, `style`)
+   - `.py` or `.pyi` files in the test directory changed: `test`
+   - all other changes: `other` (`docs`, `ci`, `chore`, `build`)
+
+   A file in the test directory is a test file, also when the test directory is in the
+   source directory.
 
 Other modules:
 
 - `models.py`, `enums.py` and `exceptions.py`: the frozen dataclasses, the `StrEnum`s
   and the `DiffractError` exceptions.
-- `config.py`: reads `src` from `diffract.toml` or from `[tool.diffract]` in
-  `pyproject.toml`. The `--src` flag has priority over both files.
+- `config.py`: reads `src` and `tests` from `diffract.toml` or from `[tool.diffract]` in
+  `pyproject.toml`. The `--src` and `--tests` flags have priority over both files.
 - `cli.py`: the `diffract` command. With `--validate-msg-file` and no refs, it compares
   `HEAD` with the staging area. This is the `commit-msg` hook mode. The check fails
   only if the message tells less than the API change: removed names need a `!` or a

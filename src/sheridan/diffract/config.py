@@ -20,32 +20,55 @@ class DiffractConfig:
     Attributes:
         src: The source directory in the repository, or ``None`` if no configuration
             file sets it.
+        tests: The test directory in the repository, or ``None`` if no configuration
+            file sets it.
     """
 
     src: str | None = None
+    tests: str | None = None
 
 
-def _parse_src(data: dict[str, Any], config_file: Path) -> str | None:
-    """Get the ``src`` value from a TOML table and make sure that it is a string.
+def _parse_str(data: dict[str, Any], key: str, config_file: Path) -> str | None:
+    """Get a value from a TOML table and make sure that it is a string.
 
     Args:
         data: The parsed TOML table.
+        key: The key of the value, for example ``"src"``.
         config_file: The path of the configuration file, for the error message.
 
     Returns:
-        The value of ``src``, or ``None`` if the table has no ``src`` key.
+        The value of ``key``, or ``None`` if the table has no ``key`` key.
 
     Raises:
-        DiffractError: If ``src`` is not a string.
+        DiffractError: If the value is not a string.
     """
-    src = data.get("src")
-    if src is None:
+    value = data.get(key)
+    if value is None:
         return None
-    if not isinstance(src, str):
+    if not isinstance(value, str):
         raise DiffractError(
-            f"Incorrect diffract configuration in {config_file}: 'src' must be a string, not {type(src).__name__!r}"
+            f"Incorrect diffract configuration in {config_file}: {key!r} must be a string, not {type(value).__name__!r}"
         )
-    return src
+    return value
+
+
+def _parse_config(data: dict[str, Any], config_file: Path) -> DiffractConfig:
+    """Make a ``DiffractConfig`` from the diffract TOML table.
+
+    Args:
+        data: The parsed diffract TOML table.
+        config_file: The path of the configuration file, for the error message.
+
+    Returns:
+        The configuration in the table.
+
+    Raises:
+        DiffractError: If ``src`` or ``tests`` is not a string.
+    """
+    return DiffractConfig(
+        src=_parse_str(data, "src", config_file),
+        tests=_parse_str(data, "tests", config_file),
+    )
 
 
 def _get_table(data: dict[str, Any], key: str, config_file: Path, prefix: str = "") -> dict[str, Any]:
@@ -106,18 +129,18 @@ def load_config(repo_root: Path) -> DiffractConfig:
 
     Raises:
         DiffractError: If the configuration file is not correct TOML, if ``tool`` or
-            ``tool.diffract`` is not a table, or if ``src`` is not a string.
+            ``tool.diffract`` is not a table, or if ``src`` or ``tests`` is not a string.
     """
     diffract_toml = repo_root / "diffract.toml"
     if diffract_toml.is_file():
         data = _load_toml(diffract_toml)
-        return DiffractConfig(src=_parse_src(data, diffract_toml))
+        return _parse_config(data, diffract_toml)
 
     pyproject_toml = repo_root / "pyproject.toml"
     if pyproject_toml.is_file():
         data = _load_toml(pyproject_toml)
         tool = _get_table(data, "tool", pyproject_toml)
         tool_diffract = _get_table(tool, "diffract", pyproject_toml, prefix="tool.")
-        return DiffractConfig(src=_parse_src(tool_diffract, pyproject_toml))
+        return _parse_config(tool_diffract, pyproject_toml)
 
     return DiffractConfig()

@@ -41,7 +41,7 @@ def test_unsafe_link_outside_src_does_not_stop_diffract(repo: GitRepo, target: s
 
     assert proc.returncode == 0, proc.stderr
     data = json.loads(proc.stdout)
-    assert data["commit_type"] == "feat"
+    assert data["group"] == "feat"
     assert data["diff"]["added"] == [{"module": "pkg", "name": "gamma"}]
 
 
