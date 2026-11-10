@@ -1,162 +1,72 @@
-# CLAUDE.md — sheridan-diffract
+# CLAUDE.md
 
-## Project overview
+diffract (`sheridan-diffract` on PyPI) finds how the public API of a Python package
+changed between two git refs. It gives the Conventional Commit type for that change. It
+does not read the AST itself: `sheridan-iceberg` extracts the public API.
 
-`sheridan-diffract` detects how a Python package's public API changed between two git commits and classifies that change as a conventional commit type. It has no AST logic of its own — it delegates API surface extraction entirely to `sheridan-iceberg`.
+## Check command
 
-## Commands
-
-```bash
-task check          # full gate: lint, format, typecheck, tests, sdist (run before every commit)
-task lint           # ruff check --fix
-task lint:check     # ruff check (read-only, used in CI)
-task format         # ruff format
-task format:check   # ruff format --check (read-only, used in CI)
-task typecheck      # pyrefly check (strict preset, src/ and tests/)
-task test           # pytest --cov (coverage ≥ 90% required)
-task install        # uv sync (dev + test dependency groups)
-task lock:check     # uv lock --check (uv.lock is up to date)
-task security:check # bandit -r src/
-task sdist:check    # sdist ships only src, tests, README, LICENSE, CHANGELOG, pyproject
-task docs:build     # build the Zensical docs
-```
+Run `task check` before you say that a change is done. It runs these gates:
+`lint:check`, `format:check`, `typecheck` (pyrefly), `test` and `sdist:check`. All gates
+must pass. CI also runs `lock:check`, `security:check` and `docs:build`.
+`CONTRIBUTING.md` lists the other tasks.
 
 ## Architecture
 
-```
-src/sheridan/diffract/
-├── __init__.py      # Public re-exports; __version__ from importlib.metadata
-├── enums.py         # CommitType, ChangeKind (StrEnum)
-├── exceptions.py    # DiffractError → GitError / SurfaceError
-├── models.py        # NameChange, ApiDiff, DiffractResult (frozen dataclasses)
-├── differ.py        # diff_surfaces() — set-diff two iceberg API surfaces
-├── classifier.py    # classify() — maps ApiDiff → CommitType + summary
-├── git_utils.py     # get_repo(), get_api_at_ref(), has_python_changes(), get_api_at_index(), has_python_changes_index()
-├── checker.py       # check() — orchestrates git → iceberg → diff → classify; check_staged() — HEAD vs index
-├── config.py        # load_config() — DiffractConfig from diffract.toml / pyproject.toml
-└── cli.py           # argparse CLI: `diffract [BASE] [HEAD] [--src] [--json] [--exit-code] [--validate-msg-file]`
-```
+The code is in `src/sheridan/diffract/`. `checker.py` connects the steps:
 
-### Key dependency: sheridan-iceberg
+1. Git: `git_utils.py` uses `git archive` to write the tree of a ref (or of the staging
+   area) to a temporary directory. It also finds if `.py` files changed.
+2. Extract: `git_utils.py` calls `sheridan.iceberg.get_public_api` on each tree to get
+   the public names.
+3. Diff: `differ.py` compares the two sets of names and makes an `ApiDiff`.
+4. Classify: `classifier.py` gives the commit type, in this order of priority:
+   - a public name was removed: `feat!`
+   - a public name was added: `feat`
+   - no name changed, but `.py` files changed: `refactor`
+   - no change: `fix`
 
-```python
-from sheridan.iceberg import get_public_api
-# get_public_api(path: Path | str) -> dict[str, list[str]]
-# Returns: {"module.qualified.name": ["PublicName1", "ClassFoo", ...], ...}
-```
+Other modules:
 
-`diffract` calls `get_public_api` twice (once per ref), then diffs the two dicts.
+- `models.py`, `enums.py` and `exceptions.py`: the frozen dataclasses, the `StrEnum`s
+  and the `DiffractError` exceptions.
+- `config.py`: reads `src` from `diffract.toml` or from `[tool.diffract]` in
+  `pyproject.toml`. The `--src` flag has priority over both files.
+- `cli.py`: the `diffract` command. With `--validate-msg-file` and no refs, it compares
+  `HEAD` with the staging area. This is the `commit-msg` hook mode.
 
-### Classification rules (in priority order)
-
-1. Any public name **removed** → `feat!` (breaking)
-2. Any public name **added** (no removals) → `feat`
-3. No name changes, but `.py` files changed → `refactor`
-4. No changes detected → `fix`
+diffract compares names only. It does not compare signatures, and it does not change
+commits. `docs/decisions/` has the architecture decision records (ADRs).
 
 ## Code conventions
 
-- **Python ≥ 3.14** — use modern syntax freely (`X | Y`, `match`, etc.)
-- **No `from __future__ import annotations`** — not needed on Python 3.14
-- **No banner comments** (`# ------`), enforced by `tests/unit/test_comment_style.py` and the `no-banner-comments` hook
-- **Docstrings never start with "Return"/"Returns"** — use a specific verb (`tests/unit/test_docstring_style.py`)
-- **`__all__`** declared in every module
-- **Frozen dataclasses** for all result/model types
-- **`StrEnum`** for enumerations
-- **Google-style docstrings** on all public functions, classes, and methods
-- **Line length**: 120 characters (ruff enforced)
-- **Import order**: stdlib → third-party → local (isort via ruff)
+- Write all prose (docs, READMEs, docstrings, comments, CLI messages, issue, commit and
+  PR bodies) in ASD-STE100 Simplified Technical English. Load the `ste100` skill before
+  you write or edit prose.
+- No banner or section-divider comments: no lines made only of `#` and a run of `-` or
+  `=`, and no title comments wrapped in them. To group code, use a test class, a
+  separate module or a docstring. `tests/unit/test_comment_style.py` and the
+  `no-banner-comments` prek hook enforce this.
+- Write a comment only when it says something the code can't: a reason, a constraint
+  or a non-obvious consequence. Don't label sections or restate what the code does.
+- Readability matters: code is read far more often than it is written. When two ways
+  work, pick the one that is easier to read. Follow the Zen of Python
+  (`python -c "import this"`), above all: readability counts; explicit is better than
+  implicit; simple is better than complex; flat is better than nested.
+- Whitespace is your friend. Use blank lines to split a function into its logical steps
+  (setup, work, result). Flatten nesting with early returns, and prefer a plain loop or
+  a named intermediate value to a clever one-liner.
 
-## Testing conventions
+The `python-dev` skill has the tools and the Python rules. The `git-workflow` skill has
+the branch, commit, PR and release rules.
 
-- **pytest** only — never `unittest.TestCase`
-- **pytest-mock** for patching: use the `mocker` fixture, not `unittest.mock.patch`
-- **`monkeypatch`** for environment/`sys.argv` modification
-- **No `MagicMock` as fixture arguments** — construct them inline with `MagicMock()`
-- `tests/unit/`: fast tests that mock git and iceberg. One test file per source module:
-  `test_<module>.py`. Shared fixtures live in `tests/unit/conftest.py`
-- `tests/functional/`: end-to-end tests that make temporary git repositories and run the real
-  `diffract` CLI, git and iceberg (classification, `--json`, `--exit-code`, a real commit-msg
-  hook, a dogfood run on this repository, and the README examples). Fixtures live in
-  `tests/functional/conftest.py`
-- Coverage threshold: **≥ 90%** (enforced by pytest-cov)
+## Claude Code files
 
-## Dependencies
+Commit new skills, agents and settings in `.claude/`. A file stays local only if
+`.gitignore` lists it, for example the issue loop (`.claude/skills/next-issue/`).
+`.claude/settings.local.json` is for your own settings and is not tracked.
 
-- **Runtime**: `sheridan-iceberg`, `gitpython`
-- **Dev**: `ruff`, `pyrefly`, `pytest`, `pytest-cov`, `pytest-mock`, `commitizen`, `prek`, `bandit`, `zensical`, `mkdocstrings`
-
-### Adding dependencies
-
-Always run the dependency auditor before adding a new runtime dependency. Context matters: the automated auditor rejected `gitpython` on security grounds, but human review approved it (see ADR-002) because the CVEs are patched, inputs are controlled, and it handles git hook environment variables correctly.
-
-## Commit format (Conventional Commits via commitizen)
-
-```
-feat:     add new public API
-feat!:    remove or rename a public API (breaking)
-fix:      correct a bug with no API change
-refactor: internal restructuring, no API change
-docs:     documentation only
-test:     add or update tests
-chore:    maintenance (deps, config, tooling)
-```
-
-## GitHub Actions workflows
-
-Workflow files live in `.github/workflows/` and use the **`.yaml` extension** (not `.yml`).
-
-`ci.yaml` has one "All gates" job: it runs `uv sync --locked`, then each gate as a `task` step
-(lock, lint, format, typecheck, test, security, docs). Each gate runs after a failed gate too.
-
-## Architecture Decision Records
-
-Significant decisions are documented in `docs/decisions/`. Use the `adr` skill to add new ones.
-
-## Configuration
-
-diffract reads `src` from the first config file found in the repo root:
-
-| File | Key |
-|---|---|
-| `diffract.toml` | `src = "python/src"` |
-| `pyproject.toml` | `[tool.diffract]` → `src = "python/src"` |
-
-If neither file is present, `--src` CLI flag is used, falling back to `src/`.
-
-Priority: `--src` flag > `diffract.toml` > `pyproject.toml` > default (`src/`)
-
-## CLI flags
-
-```
-diffract [BASE] [HEAD]            # defaults: HEAD~1, HEAD
-  --src PATH                      # source directory (default: src); use --src . for flat layouts
-  --json                          # output JSON instead of human-readable text
-  --exit-code                     # exit 1 (breaking), 2 (any API change), 0 (no change)
-  --validate-msg-file MSGFILE     # validate conventional commit type against detected API change
-```
-
-When `--validate-msg-file` is used **without** explicit `BASE`/`HEAD` refs (the standard commit-msg hook invocation), diffract automatically compares `HEAD` against the **git staging area** rather than `HEAD~1 → HEAD`. This ensures the hook validates what is actually being committed, not what was committed last. Pass explicit refs to override (e.g. for CI use with `diffract base.sha head.sha --validate-msg-file …`).
-
-## pre-commit hooks
-
-One hook is exported from `.pre-commit-hooks.yaml` (works with pre-commit and prek):
-
-| Hook id | Stage | Purpose |
-|---|---|---|
-| `diffract-validate` | commit-msg | Fails if the commit message type doesn't match the detected API change |
-
-This repo's own hooks are managed by prek (`uv run prek install`) and run as local hooks through
-`uv run --frozen`, including `diffract --validate-msg-file` on `commit-msg`.
-
-The hook reads `src` from `diffract.toml` or `pyproject.toml` automatically:
-
-```yaml
-- id: diffract-validate
-```
-
-## What diffract does NOT do
-
-- No AST logic — all API surface extraction is delegated to `sheridan-iceberg`
-- No signature diffing — only name-level additions/removals are detected
-- No automatic commit rewriting — diffract only reports and optionally fails CI
+`.claude/settings.json` stops pushes to `main` and force-pushes. In an interactive
+session, the `.claude/hooks/ask-before-merge.sh` hook asks you before each merge
+command. Headless sessions (`claude -p`) skip this question, so that the issue loop can
+enable auto-merge.
