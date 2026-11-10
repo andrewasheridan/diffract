@@ -27,7 +27,12 @@ tasks:
   install:
     desc: Install all dependencies
     cmds:
-      - uv sync --all-extras --dev
+      - uv sync
+
+  lock:check:
+    desc: Check that uv.lock is up to date with pyproject.toml
+    cmds:
+      - uv lock --check
 
   lint:
     desc: Run ruff linter and autofix issues
