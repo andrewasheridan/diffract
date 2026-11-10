@@ -10,12 +10,69 @@ __all__ = [
 
 import tarfile
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 
 from git import BadName, InvalidGitRepositoryError, Repo
 
 from sheridan.diffract.exceptions import GitError, SurfaceError
-from sheridan.iceberg import get_public_api
+from sheridan.iceberg import Module, Package, get_public_api
+
+
+def _iter_modules(api: Package | Module) -> Iterator[Module]:
+    """Find each module in an iceberg API tree, depth first.
+
+    Args:
+        api: The tree that ``sheridan.iceberg.get_public_api`` makes.
+
+    Yields:
+        Each ``Module`` in the tree.
+    """
+    if isinstance(api, Module):
+        yield api
+        return
+
+    yield from api.modules
+    for subpackage in api.subpackages:
+        yield from _iter_modules(subpackage)
+
+
+def _module_names(module: Module) -> list[str]:
+    """Collect the public names of one module, sorted.
+
+    Args:
+        module: An iceberg ``Module``.
+
+    Returns:
+        The names of the assignments, classes, functions and unresolved references.
+    """
+    members = (*module.assignments, *module.classes, *module.functions, *module.references)
+    return sorted(member.name for member in members)
+
+
+def _read_api(api_root: Path) -> dict[str, list[str]]:
+    """Extract the public API below ``api_root`` as a map of module names to public names.
+
+    iceberg puts the name of ``api_root`` in front of each module name. If ``api_root`` is
+    not a package (it has no ``__init__.py``), the function removes that prefix. Thus, the
+    module names do not change with the name of the source directory or of a temporary
+    directory.
+
+    Args:
+        api_root: The directory that contains the Python packages.
+
+    Returns:
+        A map of each dotted module name to its sorted public names.
+    """
+    api = get_public_api(api_root)
+    prefix = "" if (api_root / "__init__.py").exists() else f"{api_root.name}."
+
+    surface: dict[str, list[str]] = {}
+    for module in _iter_modules(api):
+        name = module.name.removeprefix(prefix)
+        surface[name] = _module_names(module)
+
+    return surface
 
 
 def get_repo(path: Path) -> Repo:
@@ -51,7 +108,7 @@ def get_api_at_ref(repo: Repo, ref: str, src_path: str = "src") -> dict[str, lis
 
     Returns:
         A mapping of fully-qualified module name to list of public names,
-        as returned by ``sheridan.iceberg.get_public_api``.
+        sorted. The module names are relative to ``src_path``.
 
     Raises:
         GitError: If ``ref`` is not a valid ref in the repository.
@@ -74,7 +131,7 @@ def get_api_at_ref(repo: Repo, ref: str, src_path: str = "src") -> dict[str, lis
             api_root = Path(tmp)
 
         try:
-            return get_public_api(api_root)
+            return _read_api(api_root)
         except Exception as exc:
             raise SurfaceError(f"Failed to extract public API at ref {ref!r}: {exc}") from exc
 
@@ -115,7 +172,7 @@ def get_api_at_index(repo: Repo, src_path: str = "src") -> dict[str, list[str]]:
 
     Returns:
         A mapping of fully-qualified module name to list of public names,
-        as returned by ``sheridan.iceberg.get_public_api``.
+        sorted. The module names are relative to ``src_path``.
 
     Raises:
         GitError: If tree materialisation or archive extraction fails.
@@ -139,7 +196,7 @@ def get_api_at_index(repo: Repo, src_path: str = "src") -> dict[str, list[str]]:
             api_root = Path(tmp)
 
         try:
-            return get_public_api(api_root)
+            return _read_api(api_root)
         except Exception as exc:
             raise SurfaceError(f"Failed to extract public API from index: {exc}") from exc
 

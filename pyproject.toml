@@ -23,7 +23,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "sheridan-iceberg>=2.0.0,<3",
+    "sheridan-iceberg>=8.0.10,<9",
     "gitpython>=3.1.46",
 ]
 
