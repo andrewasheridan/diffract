@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.14"
 resolution-markers = [
     "python_full_version >= '3.15'",
@@ -686,7 +686,7 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "gitpython", specifier = ">=3.1.46" },
-    { name = "sheridan-iceberg", specifier = ">=2.0.0,<3" },
+    { name = "sheridan-iceberg", specifier = ">=8.0.10,<9" },
 ]
 
 [package.metadata.requires-dev]
@@ -710,11 +710,11 @@ test = [
 
 [[package]]
 name = "sheridan-iceberg"
-version = "2.0.0"
+version = "8.0.10"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/e5/cc/c9bddf9a0d3a83e6c48ab9d779cecfca39850d0b8cc650644ce79079807c/sheridan_iceberg-2.0.0.tar.gz", hash = "sha256:1d62a7a34a87365ba888d25407f25966d2aafb21288344a6177e6d22389613e1", size = 60607, upload-time = "2026-03-24T04:08:43.32Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/94/84/89aebacb93ff4b835c279ad8345067375dea0ab62ab3d164f603d8aa577a/sheridan_iceberg-8.0.10.tar.gz", hash = "sha256:d282d3ac193407f83971cfa5947308fb4ace1179980e349b4b9f63004caab04e", size = 125316, upload-time = "2026-11-10T15:37:30.736Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d4/c9/16731ec2b9345c0e1629e8b371849a445a70c5797abee0809fe14814a96b/sheridan_iceberg-2.0.0-py3-none-any.whl", hash = "sha256:e284cd17bb3d5e7ce32f3e2f43315f2443477d4fd6b7adf99d12d5a3e3e83fb7", size = 16019, upload-time = "2026-03-24T04:08:42.016Z" },
+    { url = "https://files.pythonhosted.org/packages/09/9f/e990a2dce5d7e0bc4778b58edae8c86256117e47ce4c262174d073a82675/sheridan_iceberg-8.0.10-py3-none-any.whl", hash = "sha256:745650ca3ee0cce73062e41e38fc5faf7b784705e7668ac2c96fcbac31627315", size = 65121, upload-time = "2026-11-10T15:37:29.33Z" },
 ]
 
 [[package]]
