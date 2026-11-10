@@ -71,8 +71,12 @@ from sheridan.iceberg import get_public_api
 - **pytest-mock** for patching: use the `mocker` fixture, not `unittest.mock.patch`
 - **`monkeypatch`** for environment/`sys.argv` modification
 - **No `MagicMock` as fixture arguments** — construct them inline with `MagicMock()`
-- Shared fixtures live in `tests/conftest.py`
-- One test file per source module: `test_<module>.py`
+- `tests/unit/`: fast tests that mock git and iceberg. One test file per source module:
+  `test_<module>.py`. Shared fixtures live in `tests/unit/conftest.py`
+- `tests/functional/`: end-to-end tests that make temporary git repositories and run the real
+  `diffract` CLI, git and iceberg (classification, `--json`, `--exit-code`, a real commit-msg
+  hook, a dogfood run on this repository, and the README examples). Fixtures live in
+  `tests/functional/conftest.py`
 - Coverage threshold: **≥ 90%** (enforced by pytest-cov)
 
 ## Dependencies

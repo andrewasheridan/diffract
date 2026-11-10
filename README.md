@@ -56,7 +56,7 @@ diffract --exit-code
 Detected: feat!  (breaking change)
 
 Removed public names:
-  sheridan.diffract.enums:
+  sheridan.diffract:
     - OldHelper
 
 Suggested commit prefix: feat!:

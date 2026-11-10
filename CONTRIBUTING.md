@@ -12,7 +12,9 @@ uv run prek install
 ## Workflow
 
 1. Create a feature branch from `main`
-2. Write your code and tests (coverage must remain ≥ 90%)
+2. Write your code and tests (coverage must remain ≥ 90%): unit tests that mock git and iceberg go in
+   `tests/unit/`, and end-to-end tests that run the real CLI in a temporary git repository go in
+   `tests/functional/`
 3. Run `task check` — all gates must pass
 4. Commit using [Conventional Commits](https://www.conventionalcommits.org/) format
 5. Open a pull request
