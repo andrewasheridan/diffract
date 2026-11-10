@@ -1,6 +1,6 @@
-# Contributing to sheridan-diffract
+# How to contribute to sheridan-diffract
 
-Thank you for considering a contribution!
+Thank you for your contribution.
 
 ## Setup
 
@@ -11,19 +11,22 @@ uv run prek install
 
 ## Workflow
 
-1. Create a feature branch from `main`
-2. Write your code and tests (coverage must remain ≥ 90%): unit tests that mock git and iceberg go in
-   `tests/unit/`, and end-to-end tests that run the real CLI in a temporary git repository go in
-   `tests/functional/`
-3. Run `task check` — all gates must pass
-4. Commit using [Conventional Commits](https://www.conventionalcommits.org/) format
-5. Open a pull request
+1. Create a branch from `main`.
+2. Write the code. Obey the [writing style](#writing-style), [comment](#comments) and
+   [readability](#readability) rules.
+3. Write tests. The minimum coverage is 90%.
+   - Put unit tests that mock git and iceberg in `tests/unit/`.
+   - Put end-to-end tests in `tests/functional/`. These tests run the real CLI in a
+     temporary git repository.
+4. Run `task check`. All the gates must pass.
+5. Commit with a [Conventional Commits](https://www.conventionalcommits.org/) message.
+6. Open a pull request.
 
-## Running checks
+## Checks
 
 ```bash
 task check        # all gates: lint, format, typecheck, test, sdist, api
-task lint         # ruff check + autofix
+task lint         # ruff check, with autofix
 task format       # ruff format
 task typecheck    # pyrefly check (strict preset)
 task test         # pytest with coverage
@@ -31,12 +34,16 @@ task api:update   # write the public API to api.txt
 ```
 
 `api.txt` is the public API of `src/sheridan/`, as `iceberg` shows it. `task api:check`
-fails when the public API is different from `api.txt`. When you change the public API on
-purpose, run `task api:update` and commit `api.txt` with your change.
+fails if the public API is different from `api.txt`. If you change the public API
+intentionally, do these steps:
+
+1. Run `task api:update`.
+2. Commit `api.txt` together with your change.
 
 ## Commit format
 
-This project uses [Commitizen](https://commitizen-tools.github.io/commitizen/) with Conventional Commits:
+This project uses [Commitizen](https://commitizen-tools.github.io/commitizen/) to make
+sure that commits obey Conventional Commits:
 
 ```
 feat: add new feature
@@ -47,25 +54,121 @@ refactor: code restructuring without behavior change
 test: add or update tests
 ```
 
-## Adding dependencies
+## Writing style
 
-- Propose new runtime dependencies in a PR with a clear justification
-- Keep the runtime dependency list minimal
-- Dev dependencies go under `[dependency-groups]`: test tools in `test`, everything else in `dev` (which includes `test`)
-- `uv.lock` is tracked: run `uv lock` after changing dependencies and commit it (`task lock:check` verifies it)
+Write all prose in ASD-STE100 Simplified Technical English (STE). STE is a controlled
+language: it uses common words, short sentences and the active voice. Text in STE has
+only one possible meaning.
 
-## Architecture Decision Records
+The rule applies to:
 
-Significant decisions are recorded as ADRs in `docs/decisions/`.
-Use the `docs/decisions/` directory to document any non-obvious choices.
+- `README.md`, `CONTRIBUTING.md` and the files in `docs/` (ADRs too)
+- docstrings and code comments
+- CLI help text, error and log messages
+- issue, commit and PR bodies
+
+It does not apply to code identifiers, quoted output from other tools, the Conventional
+Commits header syntax or `CHANGELOG.md`.
+
+The `ste100` Claude Code skill (`.claude/skills/ste100/SKILL.md`) summarizes the rules.
+The full rules and the dictionary of approved words are in the ASD-STE100 specification
+at [asd-ste100.org](https://www.asd-ste100.org/).
+
+## Comments
+
+Write a comment only when it tells a thing that the code cannot tell: a reason, a
+constraint or a consequence that is not clear. Do not use banner or section-divider
+comments. A banner comment is a line made only of `#` and ten or more `-` or `=`,
+usually around a section title. To group code, use a test class, a separate module or
+a docstring.
+
+`tests/unit/test_comment_style.py` applies this rule to the full repo. The
+`no-banner-comments` prek hook finds banner comments before you commit.
+
+## Readability
+
+People read code much more frequently than they write it. When two ways work, use
+the way that is easier to read. Ruff sets the layout of each line. But Ruff does not
+decide where a blank line helps, or when a comprehension is too clever. You decide
+these things.
+
+The Zen of Python (`python -c "import this"`) is the guide. These lines are the most
+important:
+
+- Readability counts.
+- Explicit is better than implicit.
+- Simple is better than complex.
+- Flat is better than nested.
+- Sparse is better than dense.
+- If the implementation is hard to explain, it's a bad idea.
+
+Whitespace is your friend. Use blank lines for these purposes:
+
+- To divide a function into its logical steps (setup, work, result).
+- To put `if`, `for`, `with` and `try` blocks apart from the code around them.
+
+To make deep nesting flat, use early returns or guard clauses. Replace a dense
+one-liner with a plain loop or a named intermediate value.
+
+Before:
+
+```python
+def load(path: Path) -> dict[str, str]:
+    if not path.exists():
+        return {}
+    text = path.read_text()
+    pairs = {k.strip(): v.strip() for k, _, v in (l.partition("=") for l in text.splitlines() if l and not l.startswith("#"))}
+    for key in pairs:
+        if not key.isidentifier():
+            raise ValueError(key)
+    return pairs
+```
+
+After:
+
+```python
+def load(path: Path) -> dict[str, str]:
+    if not path.exists():
+        return {}
+
+    pairs: dict[str, str] = {}
+    for line in path.read_text().splitlines():
+        if not line or line.startswith("#"):
+            continue
+
+        key, _, value = line.partition("=")
+        pairs[key.strip()] = value.strip()
+
+    for key in pairs:
+        if not key.isidentifier():
+            raise ValueError(key)
+
+    return pairs
+```
+
+This is guidance, not a lint rule. Reviewers apply it.
+
+## Dependencies
+
+- Propose a new runtime dependency in a PR. Give a clear reason for it.
+- Keep the list of runtime dependencies small.
+- Put dev dependencies in `[dependency-groups]`. Put test tools in `test`. Put all
+  other tools in `dev`, which includes `test`.
+- This repo tracks `uv.lock`. After you change dependencies, run `uv lock` and commit
+  `uv.lock`. `task lock:check` makes sure that `uv.lock` is current.
+
+## Architecture decision records
+
+`docs/decisions/` has the architecture decision records (ADRs). Write an ADR for each
+important decision that is not clear from the code.
 
 ## CI pipeline
 
-CI runs one "All gates" job in GitHub Actions (`.github/workflows/ci.yaml`). It syncs the
-environment with `uv sync --locked`, then runs each gate as a `task` step. Every gate runs even
-when an earlier one fails, so one run shows all the failures.
+CI runs one "All gates" job in GitHub Actions (`.github/workflows/ci.yaml`). The job
+syncs the environment with `uv sync --locked`. Then it runs each gate as a `task` step.
+Each gate runs also if a gate before it failed. Thus one run shows all the failures.
 
-Run the same gates locally:
+To run the same gates locally, run these commands:
 
 ```bash
 task lock:check

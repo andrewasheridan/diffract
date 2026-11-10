@@ -91,7 +91,7 @@ def test_src_json_and_exit_code(readme_repo: GitRepo) -> None:
 
     data = json.loads(readme_repo.diffract("--src", "lib/", "--json").stdout)
     assert data["commit_type"] == "feat"
-    assert "- `2` — non-breaking API change (public name added)" in README
+    assert "- `2`: with `--exit-code`, a change that is not breaking (a public name was added)." in README
 
 
 def test_scope_in_the_suggestion_and_the_mismatch(readme_repo: GitRepo, tmp_path: Path) -> None:

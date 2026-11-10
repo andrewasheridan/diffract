@@ -5,37 +5,55 @@ Status: Accepted
 
 ## Context
 
-diffract needs to perform three key git operations:
-1. Open and inspect git repositories
-2. Extract files at a given commit ref via `git archive`
-3. Check whether any `.py` files changed between two refs
+diffract must do three git operations:
 
-Two approaches were available: (a) the gitpython library, or (b) subprocess calls to the git CLI directly.
+1. Open and examine git repositories.
+2. Get the files at a commit ref with `git archive`.
+3. Find whether `.py` files changed between two refs.
 
-The automated dependency auditor rejected gitpython, citing: CVE history (4 CVEs 2022–2024), lack of Python 3.14 classifier, and maintenance-mode status. However, human review overrode this rejection after investigating each concern.
+There were two possible methods:
+
+- the gitpython library
+- subprocess calls to the git CLI
+
+The automated dependency auditor rejected gitpython for these reasons:
+
+- gitpython had 4 CVEs from 2022 to 2024.
+- gitpython has no Python 3.14 classifier.
+- gitpython is in maintenance mode.
+
+A person examined each reason and overrode the rejection.
 
 ## Decision
 
-Use gitpython (≥3.1) for git operations.
+Use gitpython (3.1 or later) for git operations.
 
-This decision was made after verifying that:
-- All cited CVEs are patched in gitpython 3.1.46 (current version)
-- The CVEs involved untrusted remote URL injection; diffract controls all git arguments — no untrusted input enters subprocess calls
-- gitpython 3.1.46 imports and runs cleanly on Python 3.14.3 (tested in the project venv) despite missing classifiers
-- Snyk health score: 94/100
-- gitpython is already installed in the project venv
-- gitpython's `Repo` object reads the `GIT_DIR` and `GIT_WORK_TREE` environment variables that git sets for hooks
-- The subprocess approach would require manual environment-variable handling to be equally correct in hook contexts
+The decision is based on these facts:
 
-## Alternatives Considered
+- gitpython 3.1.46 (the current version) has a fix for each of the CVEs.
+- The CVEs are about remote URLs from untrusted sources. diffract sets all the git
+  arguments. No untrusted input goes into a subprocess call.
+- We tested gitpython 3.1.46 on Python 3.14.3 in the project environment. It imports
+  and runs correctly, although it has no classifier for Python 3.14.
+- The Snyk health score of gitpython is 94/100.
+- gitpython was already installed in the project environment.
+- The `Repo` object of gitpython reads the `GIT_DIR` and `GIT_WORK_TREE` environment
+  variables. git sets these variables for hooks.
+- With the subprocess method, diffract must read these environment variables itself
+  to be equally correct in hooks.
 
-**Subprocess + git CLI directly:** This avoids the dependency but requires careful handling of git environment variables (`GIT_DIR`, `GIT_INDEX_FILE`, `GIT_WORK_TREE`) when running as a git hook. gitpython's `Repo` object handles this normalization automatically, making it the more correct choice for this context.
+## Alternatives considered
+
+**Subprocess calls to the git CLI:** This method needs no dependency. But in a git hook,
+diffract must then read the git environment variables (`GIT_DIR`, `GIT_INDEX_FILE` and
+`GIT_WORK_TREE`) itself. The `Repo` object of gitpython does this automatically. Thus
+gitpython is the more correct choice for hooks.
 
 ## Correction: `GIT_INDEX_FILE`
 
 Date: 2026-11-10
 
-The first version of this ADR said that gitpython handles `GIT_INDEX_FILE`. That is not
+The first version of this ADR said that gitpython reads `GIT_INDEX_FILE`. That is not
 correct for `IndexFile` (`repo.index`). `IndexFile` always reads `.git/index`, and
 `IndexFile.write_tree()` also writes `.git/index`.
 
@@ -52,13 +70,19 @@ through `repo.git`, which obeys `GIT_INDEX_FILE`:
 ## Consequences
 
 **Positive:**
-- Clean, idiomatic API for git operations
-- Correct handling of `GIT_DIR` and `GIT_WORK_TREE` in git hooks
-- 94/100 Snyk health score; all known CVEs patched
-- Avoids manual subprocess complexity
+
+- gitpython has a clear API for git operations.
+- diffract reads `GIT_DIR` and `GIT_WORK_TREE` correctly in git hooks.
+- gitpython has a Snyk health score of 94/100, and all the known CVEs have a fix.
+- diffract does not have to manage subprocess calls itself.
 
 **Negative:**
-- Adds a dependency with maintenance-mode upstream; security vigilance required on upgrades
-- Upstream classifiers lag behind Python version support
 
-**Mitigation:** All git arguments are hardcoded or come from trusted CLI inputs; never interpolated from untrusted sources. This eliminates the attack surface of the cited CVEs.
+- diffract depends on a package in maintenance mode. Examine each new version of
+  gitpython for security problems before you use it.
+- The classifiers of gitpython show new Python versions later than gitpython
+  supports them.
+
+**Mitigation:** All the git arguments are in the code or come from trusted CLI input.
+diffract never puts untrusted text into a git argument. Thus the cited CVEs cannot
+attack diffract.
