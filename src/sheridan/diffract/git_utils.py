@@ -93,13 +93,12 @@ def get_repo(path: Path) -> Repo:
         raise GitError(f"No git repository found at or above: {path}") from exc
 
 
-def get_api_at_ref(repo: Repo, ref: str, src_path: str = "src") -> dict[str, list[str]]:
+def get_api_at_ref(repo: Repo, ref: str, src_path: str = "src") -> dict[str, list[str]] | None:
     """Extract the public API surface at a given git ref.
 
     Uses ``git archive`` to extract the repository tree into a temporary
     directory, then invokes ``sheridan.iceberg.get_public_api()`` on the
-    ``src_path`` subdirectory (or the temp root if that subdirectory does
-    not exist).
+    ``src_path`` subdirectory. To read the repository root, use ``"."``.
 
     Args:
         repo: The git repository to archive.
@@ -108,7 +107,8 @@ def get_api_at_ref(repo: Repo, ref: str, src_path: str = "src") -> dict[str, lis
 
     Returns:
         A mapping of fully-qualified module name to list of public names,
-        sorted. The module names are relative to ``src_path``.
+        sorted. The module names are relative to ``src_path``. ``None`` if
+        ``src_path`` does not exist at ``ref``.
 
     Raises:
         GitError: If ``ref`` is not a valid ref in the repository.
@@ -128,7 +128,7 @@ def get_api_at_ref(repo: Repo, ref: str, src_path: str = "src") -> dict[str, lis
 
         api_root = Path(tmp) / src_path
         if not api_root.exists():
-            api_root = Path(tmp)
+            return None
 
         try:
             return _read_api(api_root)
@@ -159,7 +159,7 @@ def has_python_changes(repo: Repo, base_ref: str, head_ref: str) -> bool:
     return False
 
 
-def get_api_at_index(repo: Repo, src_path: str = "src") -> dict[str, list[str]]:
+def get_api_at_index(repo: Repo, src_path: str = "src") -> dict[str, list[str]] | None:
     """Extract the public API surface from the current git staging area (index).
 
     Writes the staged tree with ``git write-tree``, then uses ``git archive`` on the
@@ -172,7 +172,8 @@ def get_api_at_index(repo: Repo, src_path: str = "src") -> dict[str, list[str]]:
 
     Returns:
         A mapping of fully-qualified module name to list of public names,
-        sorted. The module names are relative to ``src_path``.
+        sorted. The module names are relative to ``src_path``. ``None`` if
+        ``src_path`` does not exist in the staging area.
 
     Raises:
         GitError: If tree materialisation or archive extraction fails.
@@ -194,7 +195,7 @@ def get_api_at_index(repo: Repo, src_path: str = "src") -> dict[str, list[str]]:
 
         api_root = Path(tmp) / src_path
         if not api_root.exists():
-            api_root = Path(tmp)
+            return None
 
         try:
             return _read_api(api_root)

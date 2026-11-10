@@ -99,7 +99,8 @@ class TestGetApiAtRef:
         mock_tmpdir: MagicMock,
         mock_tar_open: MagicMock,
     ) -> None:
-        """Wire up the git archive + tarfile mocks shared across tests."""
+        """Wire up the git archive + tarfile mocks shared across tests, with an empty ``src`` directory."""
+        (tmp_path / "src").mkdir(exist_ok=True)
         mock_proc = MagicMock()
         mock_proc.stdout = MagicMock()
         repo.git.archive.return_value = mock_proc
@@ -143,17 +144,33 @@ class TestGetApiAtRef:
         repo.commit.return_value = MagicMock()
         mock_tar_open = mocker.patch("sheridan.diffract.git_utils.tarfile.open")
         mock_tmpdir = mocker.patch("sheridan.diffract.git_utils.tempfile.TemporaryDirectory")
-        mocker.patch("sheridan.diffract.git_utils.get_public_api", return_value=_container(tmp_path))
+        mocker.patch("sheridan.diffract.git_utils.get_public_api", return_value=_container(tmp_path / "src"))
         self._setup_archive_mocks(repo, tmp_path, mock_tmpdir, mock_tar_open)
 
         assert get_api_at_ref(repo, "HEAD") == {"mypackage.mod": ["Bar", "Foo"]}
 
-    def test_falls_back_to_tmp_root_when_src_path_missing(
+    def test_returns_none_when_src_path_missing(
         self,
         tmp_path: Path,
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """Must fall back to the temp root when the src_path subdirectory does not exist."""
+        """Must return None, and not read the root, when the src_path subdirectory does not exist."""
+        repo = MagicMock()
+        repo.commit.return_value = MagicMock()
+        mock_tar_open = mocker.patch("sheridan.diffract.git_utils.tarfile.open")
+        mock_tmpdir = mocker.patch("sheridan.diffract.git_utils.tempfile.TemporaryDirectory")
+        mock_api = mocker.patch("sheridan.diffract.git_utils.get_public_api")
+        self._setup_archive_mocks(repo, tmp_path, mock_tmpdir, mock_tar_open)
+
+        assert get_api_at_ref(repo, "HEAD", src_path="lib") is None
+        mock_api.assert_not_called()
+
+    def test_reads_the_root_when_src_path_is_a_dot(
+        self,
+        tmp_path: Path,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        """Must read the temp root when src_path is ``"."``."""
         repo = MagicMock()
         repo.commit.return_value = MagicMock()
         captured: list[Path] = []
@@ -167,9 +184,8 @@ class TestGetApiAtRef:
         mocker.patch("sheridan.diffract.git_utils.get_public_api", side_effect=capture)
         self._setup_archive_mocks(repo, tmp_path, mock_tmpdir, mock_tar_open)
 
-        # tmp_path has no "src" subdirectory, so the fallback to tmp root is triggered.
-        get_api_at_ref(repo, "HEAD", src_path="src")
-        assert captured[0] == tmp_path
+        assert get_api_at_ref(repo, "HEAD", src_path=".") == {"mypackage.mod": ["Bar", "Foo"]}
+        assert captured == [tmp_path]
 
 
 class TestGetApiAtIndex:
@@ -184,6 +200,7 @@ class TestGetApiAtIndex:
         tree_sha: str = "abc123",
     ) -> None:
         repo.git.write_tree.return_value = tree_sha
+        (tmp_path / "src").mkdir(exist_ok=True)
 
         mock_proc = MagicMock()
         mock_proc.stdout = MagicMock()
@@ -202,7 +219,7 @@ class TestGetApiAtIndex:
         repo = MagicMock()
         mock_tar_open = mocker.patch("sheridan.diffract.git_utils.tarfile.open")
         mock_tmpdir = mocker.patch("sheridan.diffract.git_utils.tempfile.TemporaryDirectory")
-        mocker.patch("sheridan.diffract.git_utils.get_public_api", return_value=_container(tmp_path))
+        mocker.patch("sheridan.diffract.git_utils.get_public_api", return_value=_container(tmp_path / "src"))
         self._setup_index_mocks(repo, tmp_path, mock_tmpdir, mock_tar_open)
 
         assert get_api_at_index(repo) == {"mypackage.mod": ["Bar", "Foo"]}
@@ -215,7 +232,7 @@ class TestGetApiAtIndex:
         repo = MagicMock()
         mock_tar_open = mocker.patch("sheridan.diffract.git_utils.tarfile.open")
         mock_tmpdir = mocker.patch("sheridan.diffract.git_utils.tempfile.TemporaryDirectory")
-        mocker.patch("sheridan.diffract.git_utils.get_public_api", return_value=_container(tmp_path))
+        mocker.patch("sheridan.diffract.git_utils.get_public_api", return_value=_container(tmp_path / "src"))
         self._setup_index_mocks(repo, tmp_path, mock_tmpdir, mock_tar_open, tree_sha="deadbeef")
 
         get_api_at_index(repo)
@@ -247,26 +264,20 @@ class TestGetApiAtIndex:
         with pytest.raises(Exception, match="index error"):
             get_api_at_index(repo)
 
-    def test_falls_back_to_tmp_root_when_src_path_missing(
+    def test_returns_none_when_src_path_missing(
         self,
         tmp_path: Path,
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
+        """Must return None, and not read the root, when the src_path subdirectory does not exist."""
         repo = MagicMock()
-        captured: list[Path] = []
-
-        def capture(path: Path) -> Package:
-            captured.append(path)
-            return _container(path)
-
         mock_tar_open = mocker.patch("sheridan.diffract.git_utils.tarfile.open")
         mock_tmpdir = mocker.patch("sheridan.diffract.git_utils.tempfile.TemporaryDirectory")
-        mocker.patch("sheridan.diffract.git_utils.get_public_api", side_effect=capture)
+        mock_api = mocker.patch("sheridan.diffract.git_utils.get_public_api")
         self._setup_index_mocks(repo, tmp_path, mock_tmpdir, mock_tar_open)
 
-        # tmp_path has no "src" subdirectory, so the fallback to tmp root is triggered.
-        get_api_at_index(repo, src_path="src")
-        assert captured[0] == tmp_path
+        assert get_api_at_index(repo, src_path="lib") is None
+        mock_api.assert_not_called()
 
 
 class TestHasPythonChangesIndex:
@@ -333,7 +344,7 @@ class TestStagingAreaInARealRepository:
         repo.git.add("mod.py")
 
         assert has_python_changes_index(repo) is True
-        assert get_api_at_index(repo, src_path="src") == {"mod": ["alpha"]}
+        assert get_api_at_index(repo, src_path=".") == {"mod": ["alpha"]}
         assert index.read_bytes() == staged
 
 
@@ -352,7 +363,9 @@ class TestReadApi:
         mocker.patch("sheridan.diffract.git_utils.tarfile.open")
         mock_tmpdir = mocker.patch("sheridan.diffract.git_utils.tempfile.TemporaryDirectory")
         mock_tmpdir.return_value.__enter__.return_value = str(tmp_path)
-        return get_api_at_ref(repo, "HEAD", src_path=src_path)
+        api = get_api_at_ref(repo, "HEAD", src_path=src_path)
+        assert api is not None
+        return api
 
     def test_collects_each_kind_of_public_name(self, tmp_path: Path, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
         """Must include assignments, classes, functions and unresolved references, sorted."""
@@ -392,6 +405,7 @@ class TestReadApi:
 
     def test_accepts_a_single_module(self, tmp_path: Path, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
         """Must accept a ``Module`` from iceberg, which it gives for one file."""
+        (tmp_path / "src").mkdir()
         mocker.patch("sheridan.diffract.git_utils.get_public_api", return_value=_module("solo", "X"))
 
         assert self._api(tmp_path, "src", mocker) == {"solo": ["X"]}

@@ -149,6 +149,12 @@ src = "python/src"
 
 Priority: explicit `--src` flag → `diffract.toml` → `pyproject.toml` → default (`src/`).
 
+diffract reads only the source directory. It does not read the repository root in its place:
+
+- If the source directory does not exist at one ref, the API at that ref is empty. For example, if the base ref is before you added `src/`, all the names at the head ref are added names.
+- If the source directory does not exist at the two refs, diffract shows an error and exits 3. Thus a typo in `--src` or in the config file does not give an incorrect result.
+- If your packages are at the repository root (a flat layout), use `--src .` or `src = "."`.
+
 ### As a GitHub Actions check
 
 Validate the **PR title** against detected API changes — the CI equivalent of the pre-commit hook.
