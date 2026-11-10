@@ -302,11 +302,12 @@ def main() -> None:
         repo_root = Path(get_repo(repo_path).working_dir)
     except DiffractError:
         repo_root = repo_path  # no repo found; check() will raise the proper error
-    config = load_config(repo_root)
-    # Priority: --src flag > config file > built-in default
-    src_path: str = args.src_path or config.src or "src"
 
     try:
+        config = load_config(repo_root)
+        # Priority: --src flag > config file > built-in default
+        src_path: str = args.src_path or config.src or "src"
+
         if args.validate_msg_file is not None and not args.base_ref and not args.head_ref:
             result = check_staged(repo_path=repo_path, src_path=src_path)
         else:

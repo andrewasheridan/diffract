@@ -1,11 +1,13 @@
 """Tests for sheridan.diffract.config."""
 
 import dataclasses
+import re
 from pathlib import Path
 
 import pytest
 
 from sheridan.diffract.config import DiffractConfig, load_config
+from sheridan.diffract.exceptions import DiffractError
 
 
 class TestDiffractConfig:
@@ -94,3 +96,24 @@ class TestLoadConfig:
         )
         result = load_config(tmp_path)
         assert result.src is None
+
+    def test_non_string_src_in_diffract_toml_raises(self, tmp_path: Path) -> None:
+        """load_config must raise DiffractError that names diffract.toml if src is not a string."""
+        config_file = tmp_path / "diffract.toml"
+        config_file.write_text("src = 3\n", encoding="utf-8")
+        with pytest.raises(DiffractError, match=re.escape(str(config_file))):
+            load_config(tmp_path)
+
+    def test_tool_diffract_not_a_table_raises(self, tmp_path: Path) -> None:
+        """load_config must raise DiffractError that names pyproject.toml if tool.diffract is not a table."""
+        config_file = tmp_path / "pyproject.toml"
+        config_file.write_text('[tool]\ndiffract = "x"\n', encoding="utf-8")
+        with pytest.raises(DiffractError, match=re.escape(str(config_file))):
+            load_config(tmp_path)
+
+    def test_tool_not_a_table_raises(self, tmp_path: Path) -> None:
+        """load_config must raise DiffractError that names pyproject.toml if tool is not a table."""
+        config_file = tmp_path / "pyproject.toml"
+        config_file.write_text('tool = "x"\n', encoding="utf-8")
+        with pytest.raises(DiffractError, match=re.escape(str(config_file))):
+            load_config(tmp_path)
