@@ -1,7 +1,5 @@
 """sheridan-diffract: Detect public API changes between git refs and classify commits."""
 
-from __future__ import annotations
-
 __all__ = [
     "ApiDiff",
     "ChangeKind",

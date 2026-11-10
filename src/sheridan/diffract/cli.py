@@ -1,7 +1,5 @@
 """Command-line interface for sheridan-diffract."""
 
-from __future__ import annotations
-
 __all__ = ["main"]
 
 import argparse

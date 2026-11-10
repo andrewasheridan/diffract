@@ -1,7 +1,5 @@
 """Data models for sheridan-diffract."""
 
-from __future__ import annotations
-
 __all__ = ["ApiDiff", "DiffractResult", "NameChange"]
 
 from dataclasses import dataclass
@@ -38,17 +36,17 @@ class ApiDiff:
 
     @property
     def is_breaking(self) -> bool:
-        """Return True if any public names were removed."""
+        """True if any public names were removed."""
         return bool(self.removed)
 
     @property
     def has_additions(self) -> bool:
-        """Return True if any public names were added."""
+        """True if any public names were added."""
         return bool(self.added)
 
     @property
     def is_empty(self) -> bool:
-        """Return True if no public names were added or removed."""
+        """True if no public names were added or removed."""
         return not self.added and not self.removed
 
 
@@ -71,7 +69,7 @@ class DiffractResult:
     head_ref: str
 
     def to_dict(self) -> dict[str, object]:
-        """Return a JSON-serialisable representation of this result.
+        """Convert this result to a JSON-serialisable dict.
 
         Returns:
             A dict with keys ``commit_type``, ``summary``, ``base_ref``,

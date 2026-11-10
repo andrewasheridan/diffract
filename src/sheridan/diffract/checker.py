@@ -1,7 +1,5 @@
 """High-level API entry point for sheridan-diffract."""
 
-from __future__ import annotations
-
 __all__ = ["check", "check_staged"]
 
 from pathlib import Path

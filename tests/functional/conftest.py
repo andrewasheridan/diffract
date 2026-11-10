@@ -1,7 +1,5 @@
 """Fixtures for the functional tests: temporary git repositories and the real diffract CLI."""
 
-from __future__ import annotations
-
 import os
 import subprocess  # nosec B404
 import sysconfig
@@ -22,7 +20,7 @@ INITIAL_PACKAGE = (
 
 
 def clean_env(home: Path) -> dict[str, str]:
-    """Return an environment that isolates git from the user's config and from git hooks.
+    """Build an environment that isolates git from the user's config and from git hooks.
 
     The ``GIT_*`` variables are removed, so a test run started from a git hook (for example
     the pre-push pytest hook) does not act on this repository.
@@ -124,7 +122,7 @@ def init_repo(path: Path, home: Path) -> GitRepo:
 
 @pytest.fixture()
 def repo(tmp_path: Path) -> GitRepo:
-    """Return a git repository with one commit: package ``pkg`` with public ``alpha`` and ``beta``."""
+    """Create a git repository with one commit: package ``pkg`` with public ``alpha`` and ``beta``."""
     home = tmp_path / "home"
     home.mkdir()
     git_repo = init_repo(tmp_path / "repo", home)

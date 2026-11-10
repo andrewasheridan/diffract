@@ -57,7 +57,9 @@ from sheridan.iceberg import get_public_api
 ## Code conventions
 
 - **Python ≥ 3.14** — use modern syntax freely (`X | Y`, `match`, etc.)
-- **`from __future__ import annotations`** at top of every file
+- **No `from __future__ import annotations`** — not needed on Python 3.14
+- **No banner comments** (`# ------`), enforced by `tests/unit/test_comment_style.py` and the `no-banner-comments` hook
+- **Docstrings never start with "Return"/"Returns"** — use a specific verb (`tests/unit/test_docstring_style.py`)
 - **`__all__`** declared in every module
 - **Frozen dataclasses** for all result/model types
 - **`StrEnum`** for enumerations

@@ -1,7 +1,5 @@
 """Exceptions for sheridan-diffract."""
 
-from __future__ import annotations
-
 __all__ = ["DiffractError", "GitError", "SurfaceError"]
 
 

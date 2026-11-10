@@ -1,7 +1,5 @@
 """API surface diffing for sheridan-diffract."""
 
-from __future__ import annotations
-
 __all__ = ["diff_surfaces"]
 
 from sheridan.diffract.enums import ChangeKind

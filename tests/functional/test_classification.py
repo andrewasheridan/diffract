@@ -1,7 +1,5 @@
 """Run the real CLI and iceberg on temporary repositories: classification, ``--json`` and ``--exit-code``."""
 
-from __future__ import annotations
-
 import json
 
 import pytest

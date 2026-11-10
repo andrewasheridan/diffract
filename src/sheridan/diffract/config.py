@@ -1,7 +1,5 @@
 """TOML config file support for sheridan-diffract."""
 
-from __future__ import annotations
-
 __all__ = ["DiffractConfig", "load_config"]
 
 import tomllib

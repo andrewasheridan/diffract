@@ -1,7 +1,5 @@
 """Tests for sheridan.diffract.enums."""
 
-from __future__ import annotations
-
 from sheridan.diffract.enums import ChangeKind, CommitType
 
 

@@ -1,7 +1,5 @@
 """Tests for sheridan.diffract.classifier."""
 
-from __future__ import annotations
-
 from sheridan.diffract.classifier import classify
 from sheridan.diffract.enums import CommitType
 from sheridan.diffract.models import ApiDiff

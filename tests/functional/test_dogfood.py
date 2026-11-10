@@ -1,7 +1,5 @@
 """Run the real diffract CLI on a clone of the diffract repository itself."""
 
-from __future__ import annotations
-
 import json
 import subprocess  # nosec B404
 from pathlib import Path
