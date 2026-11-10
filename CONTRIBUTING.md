@@ -6,7 +6,7 @@ Thank you for considering a contribution!
 
 ```bash
 task install
-pre-commit install
+uv run prek install
 ```
 
 ## Workflow

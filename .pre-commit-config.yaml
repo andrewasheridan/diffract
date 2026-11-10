@@ -1,13 +1,38 @@
+# Managed by prek (`uv run prek install`). The ruff, pyrefly, commitizen, diffract and pytest
+# hooks run through `uv run --frozen`, so they use the versions pinned in uv.lock.
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
+default_stages: [pre-commit]
+
 repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.7
+
+  - repo: builtin
     hooks:
-      - id: ruff-check
-        args: [--fix]
-      - id: ruff-format
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: no-commit-to-branch
+        args: [--branch, main]
 
   - repo: local
     hooks:
+      - id: ruff-check
+        name: ruff check
+        language: system
+        entry: uv run --frozen ruff check --fix --force-exclude
+        types_or: [python, pyi]
+        require_serial: true
+
+      - id: ruff-format
+        name: ruff format
+        language: system
+        entry: uv run --frozen ruff format --force-exclude
+        types_or: [python, pyi]
+        require_serial: true
+
       - id: pyrefly
         name: pyrefly
         language: system
@@ -15,8 +40,29 @@ repos:
         pass_filenames: false
         files: ^(src|tests)/.*\.pyi?$
 
-  # Dogfooding hook temporarily disabled: diffract-validate is currently broken.
-  # - repo: https://github.com/andrewasheridan/diffract
-  #   rev: v1.0.1  # diffract
-  #   hooks:
-  #     - id: diffract-validate
+      - id: no-banner-comments
+        name: no banner comments
+        language: pygrep
+        entry: '^\s*#\s*[-=]{10,}\s*$'
+        types_or: [python, pyi, toml, yaml, shell]
+
+      - id: commitizen
+        name: conventional commit message
+        language: system
+        entry: uv run --frozen cz check --allow-abort --commit-msg-file
+        stages: [commit-msg]
+
+      # Dogfood the diffract-validate hook from .pre-commit-hooks.yaml with the local checkout.
+      - id: diffract-validate
+        name: diffract (validate commit message type)
+        language: system
+        entry: uv run --frozen diffract --validate-msg-file
+        stages: [commit-msg]
+
+      - id: pytest
+        name: pytest
+        language: system
+        entry: uv run --frozen pytest -q
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

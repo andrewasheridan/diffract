@@ -101,7 +101,7 @@ result = check_staged()
 print(result.commit_type)  # reflects what is staged, not the last commit
 ```
 
-### Validate commit messages with pre-commit
+### Validate commit messages with pre-commit or prek
 
 `diffract` ships a `commit-msg` hook that rejects commits whose conventional commit type doesn't match the detected API change — catching `fix:` when you actually removed a public name.
 
@@ -113,7 +113,7 @@ repos:
     hooks:
       - id: diffract-validate
 ```
-- make sure to `pre-commit install --hook-type commit-msg` first
+- the hook works with both [pre-commit](https://pre-commit.com) and [prek](https://github.com/j178/prek); install the `commit-msg` hook first with `pre-commit install --hook-type commit-msg` or `prek install --hook-type commit-msg`
 
 The hook compares `HEAD` against the **git staging area** (not `HEAD~1 → HEAD`), so it correctly detects what is about to be committed rather than what was committed last. Explicit `BASE`/`HEAD` refs can be added to override this (see the GitHub Actions example below).
 
