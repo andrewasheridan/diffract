@@ -7,7 +7,7 @@
 ## Commands
 
 ```bash
-task check          # full gate: lint, format, typecheck, tests (run before every commit)
+task check          # full gate: lint, format, typecheck, tests, sdist (run before every commit)
 task lint           # ruff check --fix
 task lint:check     # ruff check (read-only, used in CI)
 task format         # ruff format
@@ -17,6 +17,7 @@ task test           # pytest --cov (coverage ≥ 90% required)
 task install        # uv sync (dev + test dependency groups)
 task lock:check     # uv lock --check (uv.lock is up to date)
 task security:check # bandit -r src/
+task sdist:check    # sdist ships only src, tests, README, LICENSE, CHANGELOG, pyproject
 task docs:build     # build the Zensical docs
 ```
 

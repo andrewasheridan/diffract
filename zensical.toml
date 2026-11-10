@@ -1,6 +1,6 @@
 [project]
 site_name = "sheridan-diffract"
-site_description = "A short description of your project"
+site_description = "Classifies public API changes between git commits as conventional commit types"
 repo_url = "https://github.com/andrewasheridan/diffract"
 repo_name = "andrewasheridan/diffract"
 docs_dir = "docs"

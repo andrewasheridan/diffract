@@ -51,13 +51,30 @@ tasks:
     cmds:
       - uv run bandit -r src/
 
+  sdist:check:
+    desc: Fail if the sdist has a top-level entry other than the files it should ship
+    cmds:
+      - |
+        dist="$(mktemp -d)"
+        trap 'rm -rf "$dist"' EXIT
+        uv build --sdist --out-dir "$dist" --quiet
+        unexpected="$(tar -tzf "$dist"/*.tar.gz | cut -d/ -f2 | grep -v '^$' | sort -u \
+          | grep -vxF -e .gitignore -e CHANGELOG.md -e LICENSE -e PKG-INFO -e README.md \
+            -e pyproject.toml -e src -e tests || true)"
+        if [ -n "$unexpected" ]; then
+          printf 'The sdist has unexpected top-level entries:\n%s\n' "$unexpected" >&2
+          echo "Check [tool.hatch.build.targets.sdist] in pyproject.toml." >&2
+          exit 1
+        fi
+
   check:
-    desc: Run all gates (lint:check, format:check, typecheck, test)
+    desc: Run all gates (lint:check, format:check, typecheck, test, sdist:check)
     cmds:
       - task: lint:check
       - task: format:check
       - task: typecheck
       - task: test
+      - task: sdist:check
 
   docs:build:
     desc: Build Zensical documentation
