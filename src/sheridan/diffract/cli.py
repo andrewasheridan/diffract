@@ -9,6 +9,7 @@ import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
+from typing import NoReturn, override
 
 from sheridan.diffract import __version__
 from sheridan.diffract.checker import check, check_staged
@@ -20,6 +21,8 @@ from sheridan.diffract.models import ApiDiff, DiffractResult, NameChange
 
 _COMMIT_TYPE_RE: re.Pattern[str] = re.compile(r"^(feat|fix|refactor)(\([^)]*\))?(!)?:")
 _BREAKING_FOOTER_RE: re.Pattern[str] = re.compile(r"^BREAKING[ -]CHANGE: ", re.MULTILINE)
+_ISSUES_URL = "https://github.com/andrewasheridan/diffract/issues"
+_ERROR_EXIT_CODE = 3
 
 
 @dataclass(frozen=True)
@@ -37,13 +40,31 @@ class _WrittenType:
     breaking: bool
 
 
+class _ArgumentParser(argparse.ArgumentParser):
+    """An argument parser that exits 3 for a usage error.
+
+    The default parser exits 2. With ``--exit-code``, 2 means an API change, so a CI job
+    cannot tell a usage error from an API change.
+    """
+
+    @override
+    def error(self, message: str) -> NoReturn:
+        """Print the usage and the error message to stderr, then exit 3.
+
+        Args:
+            message: The usage error.
+        """
+        self.print_usage(sys.stderr)
+        self.exit(_ERROR_EXIT_CODE, f"{self.prog}: error: {message}\n")
+
+
 def _build_parser() -> argparse.ArgumentParser:
     """Construct and return the argument parser for the diffract CLI.
 
     Returns:
         A fully-configured :class:`argparse.ArgumentParser` instance.
     """
-    parser = argparse.ArgumentParser(
+    parser = _ArgumentParser(
         prog="diffract",
         description="Detect public API changes between git refs and suggest a commit type.",
     )
@@ -286,12 +307,28 @@ def main() -> None:
     arguments, diffract automatically compares ``HEAD`` against the current staging area
     via :func:`~sheridan.diffract.checker.check_staged`.
 
+    An unexpected exception does not show a traceback. diffract writes a short message
+    with a link to the issue tracker to stderr.
+
     Exits with code:
       - 0: No changes detected (or --exit-code not set)
       - 1: Breaking changes detected (with --exit-code), or commit message mismatch
       - 2: Non-breaking API changes detected (with --exit-code)
-      - 3: Error during processing (git, file I/O, or surface detection)
+      - 3: Error: a usage error, a git, file or config error, or an unexpected exception
     """
+    try:
+        _run()
+    except Exception as exc:  # Every unexpected error must exit 3, not 1.
+        print(
+            f"diffract: unexpected error: {type(exc).__name__}: {exc}\n"
+            f"This is a bug in diffract. Please report it at {_ISSUES_URL}",
+            file=sys.stderr,
+        )
+        sys.exit(_ERROR_EXIT_CODE)
+
+
+def _run() -> None:
+    """Parse the arguments, run the check and exit with the applicable code."""
     parser = _build_parser()
     args = parser.parse_args()
 
@@ -319,7 +356,7 @@ def main() -> None:
             )
     except DiffractError as exc:
         print(f"Error: {exc}", file=sys.stderr)
-        sys.exit(3)
+        sys.exit(_ERROR_EXIT_CODE)
 
     if args.validate_msg_file is not None:
         msg_path = Path(args.validate_msg_file)
@@ -327,7 +364,7 @@ def main() -> None:
             raw = msg_path.read_text(encoding="utf-8")
         except OSError as exc:
             print(f"diffract: cannot read commit message file: {exc}", file=sys.stderr)
-            sys.exit(3)
+            sys.exit(_ERROR_EXIT_CODE)
 
         _lines = raw.splitlines()
         first_line = _lines[0] if _lines else ""
