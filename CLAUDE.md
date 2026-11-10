@@ -38,7 +38,18 @@ Other modules:
   `BREAKING CHANGE:` footer, and added names need `feat` or a `!`.
 
 diffract compares names only. It does not compare signatures, and it does not change
-commits. `docs/decisions/` has the architecture decision records (ADRs).
+commits.
+
+## Dependencies
+
+The dependency auditor rejected `gitpython`, but the maintainer kept it for these reasons:
+
+- The current version of `gitpython` has a fix for each of its known CVEs.
+- The CVEs are about remote URLs from untrusted sources. diffract sets all the git
+  arguments, so no untrusted input goes into a git command.
+- The `Repo` object reads the `GIT_DIR` and `GIT_WORK_TREE` environment variables that
+  git sets for hooks. diffract reads the staging area through `repo.git`, which obeys
+  `GIT_INDEX_FILE`. Do not use `repo.index`: it always reads `.git/index`.
 
 ## Code conventions
 
