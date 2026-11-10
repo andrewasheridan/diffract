@@ -1,23 +1,5 @@
 version: "3"
 
-vars:
-  # Resolve DOCKER_HOST for Dagger based on CONTAINER_RUNTIME (default: podman).
-  # To use Docker instead: CONTAINER_RUNTIME=docker task ci
-  DAGGER_DOCKER_HOST:
-    sh: |
-      rt="${CONTAINER_RUNTIME:-podman}"
-      if [ "$rt" = "docker" ]; then
-        printf '%s' "${DOCKER_HOST:-}"
-      else
-        # macOS: Podman machine symlinks its socket to /var/run/docker.sock
-        # Linux: use the systemd user socket
-        if [ -S "/var/run/docker.sock" ]; then
-          printf 'unix:///var/run/docker.sock'
-        else
-          printf 'unix:///run/user/%s/podman/podman.sock' "$(id -u)"
-        fi
-      fi
-
 tasks:
   default:
     desc: List available tasks
@@ -64,6 +46,11 @@ tasks:
     cmds:
       - uv run pytest --cov {{.CLI_ARGS}}
 
+  security:check:
+    desc: Run bandit security linter on src/
+    cmds:
+      - uv run bandit -r src/
+
   check:
     desc: Run all gates (lint:check, format:check, typecheck, test)
     cmds:
@@ -71,32 +58,6 @@ tasks:
       - task: format:check
       - task: typecheck
       - task: test
-
-  ci-init:
-    desc: Initialise the Dagger module (run once; generates ci/sdk/ and pins engineVersion)
-    summary: |
-      Uses podman by default. Override with: CONTAINER_RUNTIME=docker task ci-init
-
-      Podman socket must be active before running:
-        systemctl --user enable --now podman.socket   # Linux
-        podman machine start                          # macOS
-    env:
-      DOCKER_HOST: "{{.DAGGER_DOCKER_HOST}}"
-    cmds:
-      - dagger develop
-
-  ci:
-    desc: Run CI pipeline via Dagger (podman default; CONTAINER_RUNTIME=docker for Docker)
-    summary: |
-      Uses podman by default. Override with: CONTAINER_RUNTIME=docker task ci
-
-      Podman socket must be active before running:
-        systemctl --user enable --now podman.socket   # Linux
-        podman machine start                          # macOS
-    env:
-      DOCKER_HOST: "{{.DAGGER_DOCKER_HOST}}"
-    cmds:
-      - dagger call check --source=.
 
   docs:build:
     desc: Build Zensical documentation

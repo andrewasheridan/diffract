@@ -54,11 +54,20 @@ Use the `docs/decisions/` directory to document any non-obvious choices.
 
 ## CI pipeline
 
-The full CI pipeline runs via Dagger:
+CI runs one "All gates" job in GitHub Actions (`.github/workflows/ci.yaml`). It syncs the
+environment with `uv sync --locked`, then runs each gate as a `task` step. Every gate runs even
+when an earlier one fails, so one run shows all the failures.
+
+Run the same gates locally:
 
 ```bash
-task ci-init   # first time only
-task ci        # run all gates in containers
+task lock:check
+task lint:check
+task format:check
+task typecheck
+task test
+task security:check
+task docs:build
 ```
 
-Individual gates: `task lint:check`, `task format:check`, `task typecheck`, `task test`.
+`task check` runs lint, format, typecheck and test.
