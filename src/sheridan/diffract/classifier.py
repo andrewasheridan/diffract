@@ -1,7 +1,5 @@
 """Commit-type classification for sheridan-diffract."""
 
-from __future__ import annotations
-
 __all__ = ["classify"]
 
 from collections import defaultdict

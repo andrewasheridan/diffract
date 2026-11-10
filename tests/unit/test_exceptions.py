@@ -1,7 +1,5 @@
 """Tests for sheridan.diffract.exceptions."""
 
-from __future__ import annotations
-
 import pytest
 
 from sheridan.diffract.exceptions import DiffractError, GitError, SurfaceError

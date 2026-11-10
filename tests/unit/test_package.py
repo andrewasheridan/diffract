@@ -1,7 +1,5 @@
 """Tests for the sheridan.diffract top-level package."""
 
-from __future__ import annotations
-
 import importlib
 import importlib.metadata
 

@@ -1,7 +1,5 @@
 """Install diffract as a real git ``commit-msg`` hook and make commits through it."""
 
-from __future__ import annotations
-
 import shlex
 import subprocess  # nosec B404
 
@@ -14,7 +12,7 @@ REMOVED = '__all__ = ["alpha"]\n\n\ndef alpha() -> int:\n    return 1\n'
 
 @pytest.fixture()
 def hooked(repo: GitRepo) -> GitRepo:
-    """Return the repository with ``diffract --validate-msg-file`` as its commit-msg hook.
+    """Install ``diffract --validate-msg-file`` as the commit-msg hook of the repository.
 
     This is the command that the ``diffract-validate`` hook in ``.pre-commit-hooks.yaml`` runs.
     """
@@ -34,7 +32,7 @@ def _commit(repo: GitRepo, message: str) -> subprocess.CompletedProcess[str]:
 
 
 def _head_subject(repo: GitRepo) -> str:
-    """Return the subject of the HEAD commit."""
+    """Read the subject of the HEAD commit."""
     return repo.git("log", "-1", "--format=%s").stdout.strip()
 
 

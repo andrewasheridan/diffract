@@ -1,7 +1,5 @@
 """Tests for sheridan.diffract.config."""
 
-from __future__ import annotations
-
 import dataclasses
 from pathlib import Path
 

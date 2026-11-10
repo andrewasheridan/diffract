@@ -3,8 +3,6 @@
 Each expected output is also checked against the README text, so the README and the tool stay in step.
 """
 
-from __future__ import annotations
-
 import json
 import os
 from pathlib import Path
@@ -41,7 +39,7 @@ Suggested commit prefix: fix:
 
 @pytest.fixture()
 def readme_repo(repo: GitRepo) -> GitRepo:
-    """Return a repository with the ``sheridan.diffract`` package from the README examples.
+    """Create a repository with the ``sheridan.diffract`` package from the README examples.
 
     The history is: ``v1.2.0`` (both helpers), then a commit that removes ``OldHelper``.
     """

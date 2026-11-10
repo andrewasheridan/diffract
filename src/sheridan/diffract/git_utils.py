@@ -1,7 +1,5 @@
 """Git interaction utilities for sheridan-diffract."""
 
-from __future__ import annotations
-
 __all__ = [
     "get_api_at_index",
     "get_api_at_ref",
@@ -82,7 +80,7 @@ def get_api_at_ref(repo: Repo, ref: str, src_path: str = "src") -> dict[str, lis
 
 
 def has_python_changes(repo: Repo, base_ref: str, head_ref: str) -> bool:
-    """Return True if any ``.py`` files differ between base_ref and head_ref.
+    """Check if any ``.py`` files differ between base_ref and head_ref.
 
     Args:
         repo: The git repository to inspect.
@@ -147,7 +145,7 @@ def get_api_at_index(repo: Repo, src_path: str = "src") -> dict[str, list[str]]:
 
 
 def has_python_changes_index(repo: Repo) -> bool:
-    """Return True if any ``.py`` files differ between HEAD and the staging area.
+    """Check if any ``.py`` files differ between HEAD and the staging area.
 
     Compares the current HEAD commit against the git index (staging area).
     If the repository has no HEAD commit (initial commit edge case), returns

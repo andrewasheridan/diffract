@@ -1,7 +1,5 @@
 """Tests for sheridan.diffract.differ."""
 
-from __future__ import annotations
-
 from sheridan.diffract.differ import diff_surfaces
 from sheridan.diffract.enums import ChangeKind
 from sheridan.diffract.models import ApiDiff
