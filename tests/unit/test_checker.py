@@ -209,3 +209,60 @@ class TestCheckStaged:
 
         _, kwargs = mock_index.call_args
         assert kwargs["src_path"] == "lib"
+
+
+class TestMissingSourceDirectory:
+    """Tests for a ``src_path`` that does not exist at one ref or at the two refs."""
+
+    def _patch(self, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
+        mocker.patch("sheridan.diffract.checker.get_repo")
+        mocker.patch("sheridan.diffract.checker.has_python_changes", return_value=True)
+        mocker.patch("sheridan.diffract.checker.has_python_changes_index", return_value=True)
+
+    def test_missing_at_base_gives_an_empty_base(self, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
+        """The names at the head are added, because the base API is empty."""
+        self._patch(mocker)
+        mocker.patch("sheridan.diffract.checker.get_api_at_ref", side_effect=[None, {"pkg": ["a"]}])
+
+        result = check(repo_path=Path("/tmp"))
+
+        assert result.commit_type == CommitType.feat
+        assert [(c.module, c.name) for c in result.diff.added] == [("pkg", "a")]
+        assert result.diff.removed == ()
+
+    def test_missing_at_head_gives_an_empty_head(self, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
+        """The names at the base are removed, because the head API is empty."""
+        self._patch(mocker)
+        mocker.patch("sheridan.diffract.checker.get_api_at_ref", side_effect=[{"pkg": ["a"]}, None])
+
+        result = check(repo_path=Path("/tmp"))
+
+        assert result.commit_type == CommitType.feat_breaking
+        assert [(c.module, c.name) for c in result.diff.removed] == [("pkg", "a")]
+
+    def test_missing_at_both_refs_raises(self, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
+        """A missing source directory at the two refs is an error, not an empty diff."""
+        self._patch(mocker)
+        mocker.patch("sheridan.diffract.checker.get_api_at_ref", return_value=None)
+
+        with pytest.raises(SurfaceError, match="'lib' does not exist at v1 or at v2"):
+            check(base_ref="v1", head_ref="v2", repo_path=Path("/tmp"), src_path="lib")
+
+    def test_staged_missing_at_head_and_index_raises(self, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
+        """The commit-msg hook mode also fails when the directory is missing at HEAD and in the index."""
+        self._patch(mocker)
+        mocker.patch("sheridan.diffract.checker.get_api_at_ref", return_value=None)
+        mocker.patch("sheridan.diffract.checker.get_api_at_index", return_value=None)
+
+        with pytest.raises(SurfaceError, match="does not exist at HEAD or at the staging area"):
+            check_staged(repo_path=Path("/tmp"))
+
+    def test_staged_missing_at_head_gives_an_empty_base(self, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
+        """The staged names are added when the directory is missing at HEAD."""
+        self._patch(mocker)
+        mocker.patch("sheridan.diffract.checker.get_api_at_ref", return_value=None)
+        mocker.patch("sheridan.diffract.checker.get_api_at_index", return_value={"pkg": ["a"]})
+
+        result = check_staged(repo_path=Path("/tmp"))
+
+        assert result.commit_type == CommitType.feat

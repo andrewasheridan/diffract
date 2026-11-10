@@ -17,7 +17,12 @@ def test_real_iceberg_gives_the_api_diff(repo: GitRepo) -> None:
     repo.commit("feat!: change the api")
     git_repo = Repo(repo.path)
 
-    diff = diff_surfaces(get_api_at_ref(git_repo, "HEAD~1"), get_api_at_ref(git_repo, "HEAD"))
+    base = get_api_at_ref(git_repo, "HEAD~1")
+    head = get_api_at_ref(git_repo, "HEAD")
+    assert base is not None
+    assert head is not None
+
+    diff = diff_surfaces(base, head)
 
     assert diff == ApiDiff(
         added=(

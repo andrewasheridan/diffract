@@ -6,6 +6,7 @@ from pathlib import Path
 
 from sheridan.diffract.classifier import classify
 from sheridan.diffract.differ import diff_surfaces
+from sheridan.diffract.exceptions import SurfaceError
 from sheridan.diffract.git_utils import (
     get_api_at_index,
     get_api_at_ref,
@@ -14,6 +15,44 @@ from sheridan.diffract.git_utils import (
     has_python_changes_index,
 )
 from sheridan.diffract.models import DiffractResult
+
+type _Surface = dict[str, list[str]]
+
+
+def _resolve_surfaces(
+    base: _Surface | None,
+    head: _Surface | None,
+    src_path: str,
+    base_ref: str,
+    head_ref: str,
+) -> tuple[_Surface, _Surface]:
+    """Replace a missing source directory with an empty API.
+
+    If ``src_path`` does not exist at one ref, the API at that ref is empty. diffract
+    does not read the repository root in its place, because then the two refs can
+    give different module names.
+
+    Args:
+        base: The API at the base, or ``None`` if ``src_path`` does not exist there.
+        head: The API at the head, or ``None`` if ``src_path`` does not exist there.
+        src_path: The source directory, for the error message.
+        base_ref: The name of the base, for the error message.
+        head_ref: The name of the head, for the error message.
+
+    Returns:
+        The base API and the head API.
+
+    Raises:
+        SurfaceError: If ``src_path`` does not exist at the two refs.
+    """
+    if base is None and head is None:
+        raise SurfaceError(
+            f"The source directory {src_path!r} does not exist at {base_ref} or at {head_ref}. "
+            "Set the correct directory with --src or in the config file. "
+            "To read the repository root, use --src ."
+        )
+
+    return base or {}, head or {}
 
 
 def check(
@@ -37,13 +76,19 @@ def check(
 
     Raises:
         GitError: If the repository cannot be found or either ref is invalid.
-        SurfaceError: If API surface extraction fails for either ref.
+        SurfaceError: If API surface extraction fails for either ref, or if
+            ``src_path`` does not exist at the two refs.
     """
     resolved_path = repo_path if repo_path is not None else Path.cwd()
     repo = get_repo(resolved_path)
 
-    base_surface = get_api_at_ref(repo, base_ref, src_path=src_path)
-    head_surface = get_api_at_ref(repo, head_ref, src_path=src_path)
+    base_surface, head_surface = _resolve_surfaces(
+        get_api_at_ref(repo, base_ref, src_path=src_path),
+        get_api_at_ref(repo, head_ref, src_path=src_path),
+        src_path,
+        base_ref,
+        head_ref,
+    )
 
     diff = diff_surfaces(base_surface, head_surface)
     py_changed = has_python_changes(repo, base_ref, head_ref)
@@ -81,15 +126,21 @@ def check_staged(
 
     Raises:
         GitError: If the repository cannot be found.
-        SurfaceError: If API surface extraction fails for the index.
+        SurfaceError: If API surface extraction fails for the index, or if
+            ``src_path`` does not exist at ``HEAD`` and in the staging area.
     """
     resolved_path = repo_path if repo_path is not None else Path.cwd()
     repo = get_repo(resolved_path)
 
     # initial commit — no prior surface
-    base_surface = get_api_at_ref(repo, "HEAD", src_path=src_path) if repo.head.is_valid() else {}
-
-    head_surface = get_api_at_index(repo, src_path=src_path)
+    base = get_api_at_ref(repo, "HEAD", src_path=src_path) if repo.head.is_valid() else {}
+    base_surface, head_surface = _resolve_surfaces(
+        base,
+        get_api_at_index(repo, src_path=src_path),
+        src_path,
+        "HEAD",
+        "the staging area",
+    )
 
     diff = diff_surfaces(base_surface, head_surface)
     py_changed = has_python_changes_index(repo)
