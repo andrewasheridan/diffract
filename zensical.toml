@@ -7,6 +7,20 @@ docs_dir = "docs"
 site_dir = "site"
 nav = [
   {"Home" = "index.md"},
+  {"Getting started" = "getting-started.md"},
+  {"Configuration" = "configuration.md"},
+  {"CLI and exit codes" = "cli.md"},
+  {"commit-msg hook" = "commit-msg-hook.md"},
+  {"GitHub Actions" = "github-actions.md"},
+  {"JSON output" = "json-output.md"},
+  {"API reference" = "api/api.md"},
+  {"Decisions" = [
+    {"001. Delegate to iceberg" = "decisions/001-delegate-to-iceberg.md"},
+    {"002. Compare only names" = "decisions/002-name-level-comparison.md"},
+    {"003. Use gitpython" = "decisions/003-gitpython.md"},
+    {"004. Use pytest-mock" = "decisions/004-pytest-mock.md"},
+    {"005. Compare with the staging area" = "decisions/005-staged-index-comparison.md"},
+  ]},
 ]
 
 [project.theme]
