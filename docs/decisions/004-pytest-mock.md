@@ -1,34 +1,50 @@
-# 004. Use pytest-mock (mocker fixture) instead of unittest.mock.patch
+# 004. Use pytest-mock (the mocker fixture), not unittest.mock.patch
 
 Date: 2026-03-23
 Status: Accepted
 
 ## Context
 
-The test suite requires extensive mocking of gitpython, iceberg, and stdlib modules. Two approaches were available:
-1. `unittest.mock.patch` as context manager or decorator
-2. pytest-mock's `mocker` fixture
+The test suite mocks many parts of gitpython, iceberg and standard library modules.
+There were two possible methods:
 
-Both are widely used; the choice affects test clarity, fixture lifecycle, and consistency with pytest idioms.
+1. `unittest.mock.patch` as a context manager or a decorator
+2. the `mocker` fixture of pytest-mock
+
+Many projects use each method. The choice has an effect on the clarity of tests, on
+the life of fixtures and on the agreement with pytest conventions.
 
 ## Decision
 
-Use pytest-mock's `mocker` fixture for all patching. Use `monkeypatch` for environment and `sys.argv` modifications. `unittest.mock.MagicMock` may still be used directly to construct mock objects; only `patch()` is replaced.
+Use the `mocker` fixture of pytest-mock for all patches. Use `monkeypatch` to change
+environment variables and `sys.argv`. You can use `unittest.mock.MagicMock` directly
+to make mock objects. Only `patch()` is not permitted.
 
-## Alternatives Considered
+## Alternatives considered
 
-**unittest.mock.patch as context manager or decorator:** Allows direct use of the stdlib mock library without an additional dependency. However, it requires explicit context management (nesting or decorators) and risks patch leakage across tests if cleanup is missed. The approach is less idiomatic in pytest-based projects.
+**`unittest.mock.patch` as a context manager or a decorator:** This method uses the
+standard library and needs no dependency. But it needs a context manager (nested
+blocks) or a decorator for each patch. If the cleanup does not occur, a patch can
+stay active in other tests. This method also agrees less with pytest conventions.
 
 ## Consequences
 
 **Positive:**
-- Consistent with pytest idioms; patches are automatically undone after each test without context manager nesting
-- Patches integrate with pytest's fixture lifecycle — no risk of patch leakage across tests
-- `monkeypatch` is a built-in pytest fixture requiring no extra dependency for env/argv manipulation
-- Cleaner test code without context manager nesting
+
+- The method agrees with pytest conventions. pytest removes the patches after each
+  test, without nested context managers.
+- The patches follow the life of pytest fixtures. Thus a patch cannot stay active in
+  other tests.
+- `monkeypatch` is a pytest fixture. It needs no dependency to change environment
+  variables or `sys.argv`.
+- The test code is clearer because it has no nested context managers.
 
 **Negative:**
-- Adds `pytest-mock` as a dev dependency (lightweight, widely used, no security concerns)
-- `mocker` is not type-annotated as a standard fixture type — tests use `pytest.fixture` as type annotation with a `# type: ignore` comment until upstream improves this
 
-**Mitigation:** Use `# type: ignore` on fixture type annotations as a workaround for missing upstream type support.
+- diffract has `pytest-mock` as a dev dependency. This package is small and many
+  projects use it. It has no known security problems.
+- `mocker` has no standard type for the annotation of a fixture parameter. Thus the
+  tests use `pytest.fixture` as the annotation, with a `# type: ignore` comment.
+
+**Mitigation:** Use `# type: ignore` on the fixture annotations until pytest-mock
+gives a type.

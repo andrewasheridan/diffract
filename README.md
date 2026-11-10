@@ -1,21 +1,23 @@
 # sheridan-diffract
 
-**Detects how a Python package's public API changed between two git commits and classifies that change as a conventional commit type.**
+**diffract finds how the public API of a Python package changed between two git commits. It gives the Conventional Commit type for that change.**
 
-Most semver tools trust the developer to classify their own changes correctly. `diffract` verifies that classification against the actual diff — catching the common case where someone writes `fix:` but actually removed a public function.
+Most semver tools accept the commit type that the developer writes. `diffract` compares that type with the real change to the API. For example, it finds a commit with the type `fix:` that removed a public function.
+
+diffract supports only Python 3.14 and later.
 
 ## How it works
 
-1. Uses [sheridan-iceberg](https://github.com/andrewasheridan/iceberg) to extract the public API surface at two points in git history
-2. Diffs those two surfaces to find what was added or removed
-3. Maps the diff to a conventional commit classification:
+1. diffract uses [sheridan-iceberg](https://github.com/andrewasheridan/iceberg) to get the public API at two points in the git history.
+2. It compares the two APIs to find the names that were added or removed.
+3. It gives a Conventional Commit type for the change:
 
 | Change | Commit type |
 |---|---|
-| Public name removed | `feat!` (breaking) |
-| Public name added | `feat` |
-| Only internal/private changes in the source directory | `refactor` |
-| No changes detected | `fix` |
+| A public name was removed | `feat!` (breaking) |
+| A public name was added | `feat` |
+| Only internal or private changes in the source directory | `refactor` |
+| No change | `fix` |
 
 diffract counts a code change only in the `.py` and `.pyi` files in the source directory
 (`src` by default). A change only to a `.py` or `.pyi` file in `tests/`, `scripts/` or
@@ -35,26 +37,27 @@ pip install sheridan-diffract
 # Compare the last two commits (default)
 diffract
 
-# Compare specific refs
+# Compare specified refs
 diffract HEAD~3 HEAD
 
-# Custom source directory (default: src/)
+# Use a different source directory (default: src/)
 diffract --src lib/
 
-# Emit JSON for CI consumption
+# Write JSON for CI
 diffract --json
 
-# Exit non-zero if a breaking change is detected (for CI gates)
+# Exit with a code that is not zero if the change is breaking (for CI gates)
 diffract --exit-code
 ```
 
-You can also run diffract as a module: `python -m sheridan.diffract`. It accepts the same arguments.
+You can also run diffract as a module: `python -m sheridan.diffract`. The module accepts the same arguments.
 
 **Exit codes:**
-- `0` — no API surface changes, or `--exit-code` is not set
-- `1` — breaking change (public name removed) with `--exit-code`, or a commit message that tells less than the API change with `--validate-msg-file`
-- `2` — non-breaking API change (public name added) with `--exit-code`
-- `3` — error: a usage error, a git, file or config error, or an unexpected error. For an unexpected error, diffract writes a short message with a link to the issue tracker.
+
+- `0`: no change to the public API, or `--exit-code` is not set.
+- `1`: with `--exit-code`, a breaking change (a public name was removed). With `--validate-msg-file`, a commit message that tells less than the API change.
+- `2`: with `--exit-code`, a change that is not breaking (a public name was added).
+- `3`: an error. This can be a usage error, a git, file or configuration error, or an unexpected error. For an unexpected error, diffract writes a short message with a link to the issue tracker.
 
 **Example output:**
 
@@ -76,59 +79,54 @@ No public API changes detected.
 Suggested commit prefix: fix:
 ```
 
-Scopes are passed through to the suggestion — if your commit message includes `(parser)`, the suggested prefix will too:
-
-```
-Suggested commit prefix: feat(parser):
-```
-
 ### Python API
 
 ```python
 from sheridan.diffract import check
 
 result = check(base_ref="v1.2.0", head_ref="HEAD")
-print(result.commit_type)   # e.g. "feat!"
-print(result.summary)       # human-readable description
-print(result.diff.removed)  # tuple of NameChange objects
+print(result.commit_type)   # for example "feat!"
+print(result.summary)       # a description for people
+print(result.diff.removed)  # a tuple of NameChange objects
 print(result.diff.added)
 
-# JSON-serialisable dict for CI output
+# A dict that you can write as JSON, for CI output
 import json
 print(json.dumps(result.to_dict(), indent=2))
 ```
 
-To compare `HEAD` against the **staging area** (what the next commit will contain) — the same comparison the pre-commit hook uses:
+`check_staged` compares `HEAD` with the **staging area**, which is the content of the next commit. The `commit-msg` hook does the same comparison:
 
 ```python
 from sheridan.diffract import check_staged
 
 result = check_staged()
-print(result.commit_type)  # reflects what is staged, not the last commit
+print(result.commit_type)  # the type of the staged change, not of the last commit
 ```
 
 ### Validate commit messages with pre-commit or prek
 
-`diffract` ships a `commit-msg` hook. The hook rejects a commit message only if the message tells less than the change to the public API:
+`diffract` has a `commit-msg` hook. The hook rejects a commit message only if the message tells less than the change to the public API:
 
 - If the commit removes a public name, the message must have a `!` (for example `feat!:` or `fix!:`) or a `BREAKING CHANGE:` footer.
 - If the commit adds a public name, the type must be `feat`, or the message must have a `!`.
 
-The detected type is only an estimate from the public names. Thus the hook accepts a message that tells more than the detected type. For example, it accepts `fix:` for a change to a function body, and `feat!:` for a breaking change in behavior.
+The detected type is only an estimate from the public names. Thus the hook accepts a message that tells more than the detected type. For example, it accepts `fix:` for a change to a function body. It also accepts `feat!:` for a breaking change in behavior.
 
 ```yaml
 # .pre-commit-config.yaml
 repos:
-  - repo: https://github.com/sheridan/diffract
+  - repo: https://github.com/andrewasheridan/diffract
     rev: v<VERSION>
     hooks:
       - id: diffract-validate
 ```
-- the hook works with both [pre-commit](https://pre-commit.com) and [prek](https://github.com/j178/prek); install the `commit-msg` hook first with `pre-commit install --hook-type commit-msg` or `prek install --hook-type commit-msg`
 
-The hook compares `HEAD` against the **git staging area** (not `HEAD~1 → HEAD`), so it correctly detects what is about to be committed rather than what was committed last. Explicit `BASE`/`HEAD` refs can be added to override this (see the GitHub Actions example below).
+The hook works with [pre-commit](https://pre-commit.com) and with [prek](https://github.com/j178/prek). First, install the `commit-msg` hook. Run `pre-commit install --hook-type commit-msg` or `prek install --hook-type commit-msg`.
 
-Scopes are preserved in all output — if you write `fix(parser): …`, the mismatch message will show `fix(parser):` as written and `feat(parser):` as the suggested replacement:
+The hook compares `HEAD` with the **git staging area**, not `HEAD~1` with `HEAD`. Thus it finds the change in the commit that you make now, not the change in the last commit. To compare other refs, give `BASE` and `HEAD` refs (see the GitHub Actions example below).
+
+All output keeps the scope. If you write `fix(parser): …`, the error message shows `fix(parser):` as you wrote it. It also shows `feat(parser):` as the type that diffract found:
 
 ```
 diffract: commit type mismatch
@@ -136,35 +134,47 @@ diffract: commit type mismatch
   detected: feat(parser):
 ```
 
-The hook checks only the `feat`, `fix` and `refactor` types. It never blocks other types (`docs:`, `chore:`, `test:` and so on).
+The suggested prefix also keeps the scope:
+
+```
+Suggested commit prefix: feat(parser):
+```
+
+The hook checks only the `feat`, `fix` and `refactor` types. It never blocks other types (`docs:`, `chore:`, `test:` and other types).
 
 ### Configuration
 
-If your source code isn't in `src/`, tell diffract once in a config file rather than repeating it on every command:
+If your source code is not in `src/`, write the source directory one time in a configuration file. Then you do not have to give `--src` in each command.
 
-**`diffract.toml`** (takes precedence):
+**`diffract.toml`** (has priority over `pyproject.toml`):
+
 ```toml
 src = "python/src"
 ```
 
 **`pyproject.toml`**:
+
 ```toml
 [tool.diffract]
 src = "python/src"
 ```
 
-Priority: explicit `--src` flag → `diffract.toml` → `pyproject.toml` → default (`src/`).
+The order of priority is:
 
-diffract reads only the source directory. It does not read the repository root in its place:
+1. The `--src` flag.
+2. `diffract.toml`.
+3. `pyproject.toml`.
+4. The default (`src/`).
+
+diffract reads only the source directory. It does not read the repository root as a replacement:
 
 - If the source directory does not exist at one ref, the API at that ref is empty. For example, if the base ref is before you added `src/`, all the names at the head ref are added names.
-- If the source directory does not exist at the two refs, diffract shows an error and exits 3. Thus a typo in `--src` or in the config file does not give an incorrect result.
+- If the source directory does not exist at the two refs, diffract shows an error and exits with code 3. Thus an incorrect `--src` value or configuration value does not give an incorrect result.
 - If your packages are at the repository root (a flat layout), use `--src .` or `src = "."`.
 
 ### As a GitHub Actions check
 
-Validate the **PR title** against detected API changes — the CI equivalent of the pre-commit hook.
-The refs to diff are the PR branch HEAD versus the target branch HEAD:
+This workflow compares the **PR title** with the API change. It does in CI what the `commit-msg` hook does locally. It compares the `HEAD` of the PR branch with the `HEAD` of the target branch:
 
 ```yaml
 # .github/workflows/diffract.yml
@@ -172,7 +182,7 @@ name: diffract
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, edited]  # 'edited' catches title-only changes
+    types: [opened, synchronize, reopened, edited]  # 'edited' runs the check when only the title changes
 
 jobs:
   api-change-check:
@@ -181,7 +191,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # required to access both commit SHAs
+          fetch-depth: 0  # necessary to get the two commit SHAs
 
       - name: Install diffract
         run: pip install sheridan-diffract
@@ -197,23 +207,23 @@ jobs:
             --validate-msg-file /tmp/pr-title.txt
 ```
 
-- `base.sha` — HEAD of the target branch (e.g. `main`) at the time of the PR event
-- `head.sha` — HEAD of the PR branch
-- Non-conventional title prefixes (`docs:`, `chore:`, `test:`, etc.) are never blocked
-- Scopes are passed through: a title of `feat(parser): …` will suggest `feat(parser):` on mismatch
+- `base.sha` is the `HEAD` of the target branch (for example `main`) at the time of the PR event.
+- `head.sha` is the `HEAD` of the PR branch.
+- The check never blocks other title types (`docs:`, `chore:`, `test:` and other types).
+- The check keeps the scope. If the title is `fix(parser): …` and diffract finds an added name, the message shows `feat(parser):`.
 
 ## What it does not do
 
-- `diffract` has **no AST logic of its own**. It delegates all API surface extraction to `sheridan-iceberg`.
-- It compares public names only (additions and removals). **Signature changes** (argument renames, return type changes) are not currently detected — iceberg returns name lists, not signatures.
-- It does not modify commits or rewrite history. It only reports.
+- `diffract` has **no AST logic of its own**. `sheridan-iceberg` gets the public API.
+- It compares only public names (added names and removed names). It does not find **signature changes**, for example a new argument name or a new return type. iceberg gives lists of names, not signatures.
+- It does not change commits or the git history. It only tells you the result.
 
 ## Development
 
 ```bash
 task install        # install all dependencies
-task check          # lint + format + typecheck + tests (must all pass)
-task test           # pytest with coverage (≥90% required)
+task check          # lint, format, typecheck and tests (all must pass)
+task test           # pytest with coverage (90% or more is necessary)
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
+[CONTRIBUTING.md](CONTRIBUTING.md) has the full workflow.

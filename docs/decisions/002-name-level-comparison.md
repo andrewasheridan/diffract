@@ -1,42 +1,62 @@
-# 002. Name-level-only API comparison (no signature diffing)
+# 002. Compare only names, not signatures
 
 Date: 2026-03-23
 Status: Accepted
 
 ## Context
 
-iceberg's `get_public_api()` returns `dict[str, list[str]]` — module names mapped to lists of public *names* only. Signature information (parameter names, types, return types, defaults) is not available from this API.
+The `get_public_api()` function of iceberg returns `dict[str, list[str]]`. This maps
+module names to lists of public *names* only. This API gives no signature data:
+parameter names, types, return types or default values.
 
-The original design specification mentioned that signature changes should trigger `feat!` (breaking) classification. However, implementing signature comparison would require either enhancing iceberg to expose signature data, or performing signature extraction separately within diffract itself.
+The first design specification said that a signature change must give `feat!`
+(breaking). To compare signatures, iceberg must give signature data, or diffract must
+get the signatures itself.
 
 ## Decision
 
-diffract compares API surfaces at the name level only. Signature changes — including argument renames, type annotation changes, return type changes, or default value modifications — are not detected or classified separately.
+diffract compares the public APIs only at the level of names. It does not find
+signature changes. Examples of signature changes are a new argument name, a new type
+annotation, a new return type and a new default value.
 
-The classification rules implemented are:
-- Name removed → `feat!` (breaking)
-- Name added → `feat` (feature)
-- Python files changed but no name-level changes → `refactor`
-- No changes → `fix`
+diffract uses these rules:
 
-## Alternatives Considered
+- A name was removed: `feat!` (breaking)
+- A name was added: `feat` (feature)
+- Python files changed, but no names changed: `refactor`
+- No change: `fix`
 
-1. **Implement signature-level comparison:** Extract parameter and return type information and compare signatures before and after. This would support the original specification but would require duplicating extraction logic or enhancing iceberg first, increasing complexity and maintenance burden.
+## Alternatives considered
 
-2. **Name-level comparison only:** Compare only whether names (classes, functions, variables) exist or have been removed. This is what iceberg currently provides, is simple to implement correctly, and avoids false positives from imperfect signature analysis.
+1. **Compare signatures:** Get the parameters and the return type of each function and
+   compare them. This method obeys the first specification. But diffract must copy the
+   extraction logic, or iceberg must change first. Thus the method is more complex and
+   needs more maintenance.
+
+2. **Compare only names:** Compare only whether a name (a class, a function or a
+   variable) is present or was removed. iceberg gives this data now. This method is
+   simple to make correct. It also gives no incorrect results from a signature analysis
+   that is not complete.
 
 ## Consequences
 
 **Positive:**
-- Simple and correct at the level of data available
-- Consistent with what iceberg provides today
-- No risk of false positives from imperfect signature parsing
-- Easy to extend in the future if iceberg adds signature data
+
+- The method is simple, and it is correct for the data that diffract has.
+- The method agrees with the data that iceberg gives now.
+- No incorrect results come from signature parsing that is not complete.
+- If iceberg gives signature data in the future, diffract can easily use it.
 
 **Negative:**
-- A function that changes its signature (e.g., parameter rename) without changing its name will be classified as `fix` or `refactor` instead of `feat!` — a known gap in breaking change detection
-- Callers relying on signature stability are not automatically protected by diffract; they must implement additional tooling
-- The classification is less precise than the original specification intended
+
+- diffract gives `fix` or `refactor`, not `feat!`, for a function with a changed
+  signature and the same name. An example is a new parameter name. This is a known gap
+  in the detection of breaking changes.
+- diffract does not protect callers that need stable signatures. These callers must
+  use other tools.
+- The classification is less precise than the first specification.
 
 **Future:**
-If sheridan-iceberg is extended to return signature information as part of `get_public_api()`, diffract can add signature-level comparison rules without requiring architectural changes.
+
+If `get_public_api()` of sheridan-iceberg gives signature data in the future, diffract
+can add rules for signatures. The architecture does not have to change.
