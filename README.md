@@ -177,7 +177,7 @@ diffract reads only the source directory. It does not read the repository root a
 This workflow compares the **PR title** with the API change. It does in CI what the `commit-msg` hook does locally. It compares the `HEAD` of the PR branch with the `HEAD` of the target branch:
 
 ```yaml
-# .github/workflows/diffract.yml
+# .github/workflows/diffract.yaml
 name: diffract
 
 on:
@@ -189,19 +189,18 @@ jobs:
     name: Validate PR title against API changes
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0  # necessary to get the two commit SHAs
 
-      - name: Install diffract
-        run: pip install sheridan-diffract
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
 
-      - name: Validate PR title type matches API change
+      - name: Check that the PR title tells the API change
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           printf '%s' "$PR_TITLE" > /tmp/pr-title.txt
-          diffract \
+          uvx --from sheridan-diffract diffract \
             ${{ github.event.pull_request.base.sha }} \
             ${{ github.event.pull_request.head.sha }} \
             --validate-msg-file /tmp/pr-title.txt
@@ -209,6 +208,7 @@ jobs:
 
 - `base.sha` is the `HEAD` of the target branch (for example `main`) at the time of the PR event.
 - `head.sha` is the `HEAD` of the PR branch.
+- The check fails only if the title tells less than the API change. A removed name needs a `!` in the title, for example `feat!:`. An added name needs `feat` or a `!`.
 - The check never blocks other title types (`docs:`, `chore:`, `test:` and other types).
 - The check keeps the scope. If the title is `fix(parser): …` and diffract finds an added name, the message shows `feat(parser):`.
 
