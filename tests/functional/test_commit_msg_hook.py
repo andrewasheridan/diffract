@@ -44,13 +44,15 @@ def test_hook_rejects_a_fix_that_removes_a_name(hooked: GitRepo) -> None:
 
     assert proc.returncode != 0
     assert "Removed public names:\n  pkg:\n    - beta" in proc.stderr
-    assert "diffract: commit type mismatch\n  written:  fix(parser):\n  detected: feat(parser)!:" in proc.stderr
+    assert "diffract: commit type mismatch\n  written:  fix(parser)\n  possible: any type with a '!'" in proc.stderr
     assert _head_subject(hooked) == "feat: initial commit"
 
 
-@pytest.mark.parametrize("message", ["feat!: remove beta", "feat(api)!: remove beta", "docs: not checked"])
-def test_hook_accepts_a_matching_or_unchecked_type(hooked: GitRepo, message: str) -> None:
-    """A correct type passes. diffract never blocks a type that it does not check."""
+@pytest.mark.parametrize(
+    "message", ["feat!: remove beta", "feat(api)!: remove beta", "docs!: remove beta", "Merge branch 'x'"]
+)
+def test_hook_accepts_a_possible_type_or_a_git_message(hooked: GitRepo, message: str) -> None:
+    """A possible type passes. diffract does not check the messages that git writes."""
     hooked.write("src/pkg/__init__.py", REMOVED)
 
     proc = _commit(hooked, message)
@@ -63,13 +65,15 @@ def test_hook_accepts_a_matching_or_unchecked_type(hooked: GitRepo, message: str
     ("text", "good", "bad"),
     [
         pytest.param(REMOVED, "feat!: x", "feat: x", id="removed"),
+        pytest.param(REMOVED, "chore!: x", "chore: x", id="removed-chore"),
         pytest.param(
             INITIAL_PACKAGE.replace('"beta"]', '"beta", "gamma"]') + "gamma = 3\n", "feat: x", "fix: x", id="added"
         ),
+        pytest.param(INITIAL_PACKAGE + "\n\ndef _helper() -> None:\n    pass\n", "fix: x", "docs: x", id="code"),
     ],
 )
 def test_hook_checks_each_type(hooked: GitRepo, text: str, good: str, bad: str) -> None:
-    """The hook refuses a type that tells less, then accepts the correct type for the same staged change."""
+    """The hook refuses a type that is not possible, then accepts a possible type for the same staged change."""
     hooked.write("src/pkg/__init__.py", text)
 
     assert _commit(hooked, bad).returncode != 0
@@ -77,9 +81,12 @@ def test_hook_checks_each_type(hooked: GitRepo, text: str, good: str, bad: str) 
     assert _head_subject(hooked) == good
 
 
-@pytest.mark.parametrize("message", ["fix: x", "feat: x", "feat!: x", "refactor: x", "fix: x\n\nBREAKING CHANGE: y"])
-def test_hook_accepts_any_checked_type_for_an_internal_change(hooked: GitRepo, message: str) -> None:
-    """The detected type is only an estimate, so a change with no name change accepts each checked type."""
+@pytest.mark.parametrize(
+    "message",
+    ["fix: x", "feat: x", "feat!: x", "refactor: x", "perf: x", "style: x", "fix: x\n\nBREAKING CHANGE: y"],
+)
+def test_hook_accepts_each_possible_type_for_an_internal_change(hooked: GitRepo, message: str) -> None:
+    """A change with no name change accepts each type of the code group, feat and a breaking message."""
     hooked.write("src/pkg/__init__.py", INITIAL_PACKAGE + "\n\ndef _helper() -> None:\n    pass\n")
 
     proc = _commit(hooked, message)
@@ -88,13 +95,39 @@ def test_hook_accepts_any_checked_type_for_an_internal_change(hooked: GitRepo, m
     assert _head_subject(hooked) == message.splitlines()[0]
 
 
+@pytest.mark.parametrize(
+    ("path", "good", "bad"),
+    [
+        pytest.param("tests/test_pkg.py", "test: x", "fix: x", id="test"),
+        pytest.param("README.md", "docs: x", "test: x", id="other"),
+    ],
+)
+def test_hook_checks_the_test_and_other_groups(hooked: GitRepo, path: str, good: str, bad: str) -> None:
+    """A test change needs ``test``, and a change outside Python files needs docs, ci, chore or build."""
+    hooked.write(path, "def test_x() -> None:\n    pass\n")
+
+    assert _commit(hooked, bad).returncode != 0
+    assert _commit(hooked, good).returncode == 0
+    assert _head_subject(hooked) == good
+
+
+def test_hook_rejects_a_message_with_no_type(hooked: GitRepo) -> None:
+    """A message with no Conventional Commit type fails, and the output says so."""
+    hooked.write("README.md", "# pkg\n\nDocs.\n")
+
+    proc = _commit(hooked, "tidy up")
+
+    assert proc.returncode != 0
+    assert "written:  (no known type)\n  possible: docs, ci, chore, build" in proc.stderr
+
+
 def test_hook_ignores_the_last_commit(hooked: GitRepo) -> None:
     """A breaking last commit does not make the next commit, which changes only docs, breaking."""
     hooked.write("src/pkg/__init__.py", REMOVED)
     hooked.commit("feat!: remove beta")
     hooked.write("README.md", "# pkg\n\nDocs.\n")
 
-    proc = _commit(hooked, "fix: typo")
+    proc = _commit(hooked, "docs: typo")
 
     assert proc.returncode == 0, proc.stderr
 

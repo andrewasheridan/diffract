@@ -42,8 +42,12 @@ Other modules:
   `pyproject.toml`. The `--src` and `--tests` flags have priority over both files.
 - `cli.py`: the `diffract` command. With `--validate-msg-file` and no refs, it compares
   `HEAD` with the staging area. This is the `commit-msg` hook mode. The check fails
-  only if the message tells less than the API change: removed names need a `!` or a
-  `BREAKING CHANGE:` footer, and added names need `feat` or a `!`.
+  if the written type is not possible for the result. `feat!` needs a `!` or a
+  `BREAKING CHANGE:` footer. `feat` also accepts a breaking message. `code` accepts
+  `fix`, `refactor`, `perf`, `style`, `feat` or a breaking message. `test` needs
+  `test`, and `other` needs `docs`, `ci`, `chore` or `build`. A message with no
+  known type fails. Messages that git writes (merge, revert, fixup, squash) and
+  `revert:` messages always pass.
 
 diffract compares names only. It does not compare signatures, and it does not change
 commits.

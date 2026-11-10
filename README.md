@@ -63,7 +63,7 @@ You can also run diffract as a module: `python -m sheridan.diffract`. The module
 **Exit codes:**
 
 - `0`: no change to the public API, or `--exit-code` is not set.
-- `1`: with `--exit-code`, a breaking change (a public name was removed). With `--validate-msg-file`, a commit message that tells less than the API change.
+- `1`: with `--exit-code`, a breaking change (a public name was removed). With `--validate-msg-file`, a commit message with a type that is not possible for the change.
 - `2`: with `--exit-code`, a change that is not breaking (a public name was added).
 - `3`: an error. This can be a usage error, a git, file or configuration error, or an unexpected error. For an unexpected error, diffract writes a short message with a link to the issue tracker.
 
@@ -118,12 +118,23 @@ print(result.commit_type)  # the group of the staged change, not of the last com
 
 ### Validate commit messages with pre-commit or prek
 
-`diffract` has a `commit-msg` hook. The hook rejects a commit message only if the message tells less than the change to the public API:
+`diffract` has a `commit-msg` hook. The hook rejects a commit message if the commit type is not possible for the change:
 
-- If the commit removes a public name, the message must have a `!` (for example `feat!:` or `fix!:`) or a `BREAKING CHANGE:` footer.
-- If the commit adds a public name, the type must be `feat`, or the message must have a `!`.
+| Change that diffract finds | Types that pass |
+|---|---|
+| A public name was removed (`feat!`) | Any type with a `!` or a `BREAKING CHANGE:` footer |
+| A public name was added (`feat`) | `feat`, or any type with a `!` or a `BREAKING CHANGE:` footer |
+| Python files in the source directory changed (`code`) | `fix`, `refactor`, `perf`, `style` or `feat`, or any type with a `!` or a `BREAKING CHANGE:` footer |
+| Only Python files in the test directory changed (`test`) | `test` |
+| All other changes (`other`) | `docs`, `ci`, `chore` or `build` |
 
-The detected group is only an estimate from the public names. Thus the hook accepts a message that tells more than the detected group. For example, it accepts `fix:` for a change to a function body. It also accepts `feat!:` for a breaking change in behavior.
+The hook also obeys these rules:
+
+- A message with no type, or with a type that is not a Conventional Commit type, fails.
+- A `revert:` message always passes, because a revert can undo any change.
+- The hook does not check the messages that git writes: `Merge …`, `Revert "…"`, `fixup! …` and `squash! …`.
+
+A change in behavior does not always change a public name. Thus the hook accepts `feat` and a breaking message for a `code` change.
 
 ```yaml
 # .pre-commit-config.yaml
@@ -138,12 +149,12 @@ The hook works with [pre-commit](https://pre-commit.com) and with [prek](https:/
 
 The hook compares `HEAD` with the **git staging area**, not `HEAD~1` with `HEAD`. Thus it finds the change in the commit that you make now, not the change in the last commit. To compare other refs, give `BASE` and `HEAD` refs (see the GitHub Actions example below).
 
-All output keeps the scope. If you write `fix(parser): …`, the error message shows `fix(parser):` as you wrote it. It also shows `feat(parser):` as the type that diffract found:
+If the hook rejects the message, it shows the written type and the possible types. The written type keeps the scope. For example, `fix(parser): …` for a change that adds a public name gives:
 
 ```
 diffract: commit type mismatch
-  written:  fix(parser):
-  detected: feat(parser):
+  written:  fix(parser)
+  possible: feat, or any type with a '!' or a 'BREAKING CHANGE:' footer
 ```
 
 The suggested prefix also keeps the scope:
@@ -151,8 +162,6 @@ The suggested prefix also keeps the scope:
 ```
 Suggested commit prefix: feat(parser):
 ```
-
-The hook checks only the `feat`, `fix` and `refactor` types. It never blocks other types (`docs:`, `chore:`, `test:` and other types).
 
 ### Configuration
 
@@ -227,8 +236,7 @@ jobs:
 
 - `base.sha` is the `HEAD` of the target branch (for example `main`) at the time of the PR event.
 - `head.sha` is the `HEAD` of the PR branch.
-- The check fails only if the title tells less than the API change. A removed name needs a `!` in the title, for example `feat!:`. An added name needs `feat` or a `!`.
-- The check never blocks other title types (`docs:`, `chore:`, `test:` and other types).
+- The check uses the same rules as the `commit-msg` hook. The title type must be possible for all the changes in the PR. For example, if the PR changes code and tests, `test:` fails.
 - The check keeps the scope. If the title is `fix(parser): …` and diffract finds an added name, the message shows `feat(parser):`.
 
 ## What it does not do
