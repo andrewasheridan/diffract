@@ -8,6 +8,7 @@ from sheridan.diffract.checker import check, check_staged
 from sheridan.diffract.enums import CommitType
 from sheridan.diffract.exceptions import GitError, SurfaceError
 from sheridan.diffract.models import ApiDiff, DiffractResult
+from tests.unit.conftest import surface
 
 
 class TestCheck:
@@ -289,7 +290,7 @@ class TestMissingSourceDirectory:
     def test_missing_at_base_gives_an_empty_base(self, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
         """The names at the head are added, because the base API is empty."""
         self._patch(mocker)
-        mocker.patch("sheridan.diffract.checker.get_api_at_ref", side_effect=[None, {"pkg": ["a"]}])
+        mocker.patch("sheridan.diffract.checker.get_api_at_ref", side_effect=[None, surface({"pkg": ["a"]})])
 
         result = check(repo_path=Path("/tmp"))
 
@@ -300,7 +301,7 @@ class TestMissingSourceDirectory:
     def test_missing_at_head_gives_an_empty_head(self, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
         """The names at the base are removed, because the head API is empty."""
         self._patch(mocker)
-        mocker.patch("sheridan.diffract.checker.get_api_at_ref", side_effect=[{"pkg": ["a"]}, None])
+        mocker.patch("sheridan.diffract.checker.get_api_at_ref", side_effect=[surface({"pkg": ["a"]}), None])
 
         result = check(repo_path=Path("/tmp"))
 
@@ -328,7 +329,7 @@ class TestMissingSourceDirectory:
         """The staged names are added names if the directory is missing at HEAD."""
         self._patch(mocker)
         mocker.patch("sheridan.diffract.checker.get_api_at_ref", return_value=None)
-        mocker.patch("sheridan.diffract.checker.get_api_at_index", return_value={"pkg": ["a"]})
+        mocker.patch("sheridan.diffract.checker.get_api_at_index", return_value=surface({"pkg": ["a"]}))
 
         result = check_staged(repo_path=Path("/tmp"))
 

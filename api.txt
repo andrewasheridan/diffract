@@ -3,6 +3,9 @@ package sheridan.diffract
 ├── class ApiDiff
 │   ├── added: tuple[NameChange, ...]
 │   ├── removed: tuple[NameChange, ...]
+│   ├── changed: tuple[SignatureChange, ...]
+│   ├── property breaking_changes: tuple[SignatureChange, ...]
+│   ├── property additive_changes: tuple[SignatureChange, ...]
 │   ├── property is_breaking: bool
 │   ├── property has_additions: bool
 │   └── property is_empty: bool
@@ -32,6 +35,11 @@ package sheridan.diffract
 │   ├── module: str
 │   ├── name: str
 │   └── kind: ChangeKind
+├── class SignatureChange
+│   ├── module: str
+│   ├── name: str
+│   ├── detail: str
+│   └── is_breaking: bool
 ├── class SurfaceError(DiffractError)
 ├── def check(base_ref: str = 'HEAD~1', head_ref: str = 'HEAD', repo_path: Path | None = None, src_path: str = 'src', tests_path: str = 'tests') -> DiffractResult
 ├── def check_staged(repo_path: Path | None = None, src_path: str = 'src', tests_path: str = 'tests') -> DiffractResult

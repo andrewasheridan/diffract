@@ -45,20 +45,21 @@ diffract v1.2.0 HEAD
 
 ## How diffract gives the commit types
 
-diffract uses [sheridan-iceberg](https://github.com/andrewasheridan/iceberg) to get the public names at each ref.
-Then it compares the two sets of names and finds the changed files. It gives the group
+diffract uses [sheridan-iceberg](https://github.com/andrewasheridan/iceberg) to get the public API at each ref.
+Then it compares the two APIs and finds the changed files. It gives the group
 of possible types. The first rule that applies gives the result:
 
 | Change | Group | Possible types |
 |---|---|---|
-| A public name was removed | `feat!` | `feat!` (breaking) |
-| A public name was added | `feat` | `feat` |
+| A public name was removed, or had a breaking change (for example, a parameter was removed) | `feat!` | `feat!` (breaking) |
+| A public name was added, or had a change that adds to it (for example, a new optional parameter) | `feat` | `feat` |
 | A `.py` or `.pyi` file in the source directory changed, and no public name changed | `code` | `fix`, `refactor`, `perf`, `style` |
 | A `.py` or `.pyi` file in the test directory changed | `test` | `test` |
 | All other changes | `other` | `docs`, `ci`, `chore`, `build` |
 
-diffract compares names and file paths only. Thus it cannot tell a fix from a refactor,
-or `docs` from `ci`. It does not find signature changes.
+diffract compares the public API and the file paths only. Thus it cannot tell a fix from
+a refactor, or `docs` from `ci`. [API changes](api-changes.md) lists the changes to the
+public API that diffract finds.
 
 A file in the test directory is a test file, also when the test directory is in the
 source directory. A commit that changes source files and test files is in the `code`

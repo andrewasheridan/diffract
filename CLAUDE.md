@@ -19,13 +19,17 @@ The code is in `src/sheridan/diffract/`. `checker.py` connects the steps:
 1. Git: `git_utils.py` uses `git archive` to write only the source directory of a ref (or
    of the staging area) to a temporary directory. It also gives the paths of the changed
    files. `has_python_changes` finds if `.py` or `.pyi` files in a directory changed.
-2. Extract: `git_utils.py` calls `sheridan.iceberg.get_public_api` on each tree to get
-   the public names.
-3. Diff: `differ.py` compares the two sets of names and makes an `ApiDiff`.
+2. Extract: `git_utils.py` calls `sheridan.iceberg.get_public_api` on each tree. It gives
+   a dict from each dotted module name to the iceberg `Module`. The dotted name is the
+   key because iceberg joins a chain of single-child packages at the top of the tree.
+3. Diff: `differ.py` compares the two APIs and makes an `ApiDiff`. It finds the added
+   and removed names (also class members) and the changes to the signatures, the bases
+   and the kinds of the names at the two refs (`SignatureChange`). `docs/api-changes.md`
+   lists the rules.
 4. Classify: `classifier.py` gives the group of possible types (`CommitType`), in this
    order of priority:
-   - a public name was removed: `feat!`
-   - a public name was added: `feat`
+   - a public name was removed, or had a breaking change: `feat!`
+   - a public name was added, or had a change that adds to it: `feat`
    - `.py` or `.pyi` files in the source directory changed: `code` (`fix`, `refactor`,
      `perf`, `style`)
    - `.py` or `.pyi` files in the test directory changed: `test`
@@ -49,8 +53,8 @@ Other modules:
   known type fails. Messages that git writes (merge, revert, fixup, squash) and
   `revert:` messages always pass.
 
-diffract compares names only. It does not compare signatures, and it does not change
-commits.
+diffract does not compare type annotations, decorators or default values, and it does
+not change commits.
 
 ## Dependencies
 

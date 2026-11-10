@@ -55,5 +55,5 @@ To stop a job when the public API changes, use `--exit-code`:
             --exit-code
 ```
 
-The step fails with code 1 for a removed name and with code 2 for an added name. Read
+The step fails with code 1 for a breaking change and with code 2 for an added name. Read
 [CLI and exit codes](cli.md#exit-codes).

@@ -2,7 +2,7 @@
 
 from sheridan.diffract.classifier import classify
 from sheridan.diffract.enums import CommitType
-from sheridan.diffract.models import ApiDiff
+from sheridan.diffract.models import ApiDiff, SignatureChange
 
 
 class TestClassify:
@@ -88,3 +88,49 @@ class TestSummaryText:
     def test_other_summary(self, empty_diff: ApiDiff) -> None:
         _, summary = classify(empty_diff, code_changed=False, tests_changed=False)
         assert summary == "No Python file in the source directory or in the test directory changed."
+
+
+class TestSignatureChangeSummary:
+    """Tests for the summaries of the signature changes."""
+
+    def test_breaking_change_gives_feat_breaking(self) -> None:
+        """A breaking signature change gives ``feat!`` and names the change in the summary."""
+        diff = ApiDiff(added=(), removed=(), changed=(_change("f", "parameter 'a' was removed", breaking=True),))
+
+        commit_type, summary = classify(diff, code_changed=True, tests_changed=False)
+
+        assert commit_type == CommitType.feat_breaking
+        assert summary == "Breaking change. Breaking changes to public names: pkg: f (parameter 'a' was removed)"
+
+    def test_removed_names_and_breaking_changes_are_both_in_the_summary(self, removal_diff: ApiDiff) -> None:
+        """The summary gives the removed names, then the breaking changes."""
+        diff = ApiDiff(
+            added=(), removed=removal_diff.removed, changed=(_change("f", "*args was removed", breaking=True),)
+        )
+
+        _, summary = classify(diff, code_changed=True, tests_changed=False)
+
+        assert summary == (
+            "Breaking change. Removed public names: mypackage.mod: OldClass "
+            "Breaking changes to public names: pkg: f (*args was removed)"
+        )
+
+    def test_additive_change_gives_feat(self, addition_diff: ApiDiff) -> None:
+        """A change that only adds to a name gives ``feat``, and the summary gives the added names first."""
+        changes = (
+            _change("g", "optional parameter 'b' was added", breaking=False),
+            _change("C", "base 'Mixin' was added", breaking=False),
+        )
+        diff = ApiDiff(added=addition_diff.added, removed=(), changed=changes)
+
+        commit_type, summary = classify(diff, code_changed=True, tests_changed=False)
+
+        assert commit_type == CommitType.feat
+        assert summary == (
+            "Added public names: mypackage.mod: NewClass "
+            "Changes that add to public names: pkg: C (base 'Mixin' was added), g (optional parameter 'b' was added)"
+        )
+
+
+def _change(name: str, detail: str, *, breaking: bool) -> SignatureChange:
+    return SignatureChange(module="pkg", name=name, detail=detail, is_breaking=breaking)

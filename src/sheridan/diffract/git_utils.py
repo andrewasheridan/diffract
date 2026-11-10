@@ -16,6 +16,7 @@ from pathlib import Path, PurePosixPath
 
 from git import BadName, GitCommandError, InvalidGitRepositoryError, Repo
 
+from sheridan.diffract.differ import ApiSurface
 from sheridan.diffract.exceptions import GitError, SurfaceError
 from sheridan.iceberg import Module, Package, get_public_api
 
@@ -27,7 +28,8 @@ def _iter_modules(api: Package | Module) -> Iterator[Module]:
         api: The tree that ``sheridan.iceberg.get_public_api`` makes.
 
     Yields:
-        Each ``Module`` in the tree.
+        Each ``Module`` in the tree. The ``__init__`` module of a package has the name
+        of the package.
     """
     if isinstance(api, Module):
         yield api
@@ -38,21 +40,8 @@ def _iter_modules(api: Package | Module) -> Iterator[Module]:
         yield from _iter_modules(subpackage)
 
 
-def _module_names(module: Module) -> list[str]:
-    """Collect the public names of one module, sorted.
-
-    Args:
-        module: An iceberg ``Module``.
-
-    Returns:
-        The names of the assignments, classes, functions and unresolved references.
-    """
-    members = (*module.assignments, *module.classes, *module.functions, *module.references)
-    return sorted(member.name for member in members)
-
-
-def _read_api(api_root: Path) -> dict[str, list[str]]:
-    """Extract the public API below ``api_root`` as a map of module names to public names.
+def _read_api(api_root: Path) -> ApiSurface:
+    """Extract the public API below ``api_root`` as a map of module names to modules.
 
     iceberg puts the name of ``api_root`` in front of each module name. If ``api_root`` is
     not a package (it has no ``__init__.py``), the function removes that prefix. Thus, the
@@ -63,17 +52,12 @@ def _read_api(api_root: Path) -> dict[str, list[str]]:
         api_root: The directory that contains the Python packages.
 
     Returns:
-        A map of each dotted module name to its sorted public names.
+        A map of each dotted module name to its iceberg ``Module``.
     """
     api = get_public_api(api_root)
     prefix = "" if (api_root / "__init__.py").exists() else f"{api_root.name}."
 
-    surface: dict[str, list[str]] = {}
-    for module in _iter_modules(api):
-        name = module.name.removeprefix(prefix)
-        surface[name] = _module_names(module)
-
-    return surface
+    return {module.name.removeprefix(prefix): module for module in _iter_modules(api)}
 
 
 _PYTHON_SUFFIXES = (".py", ".pyi")
@@ -181,7 +165,7 @@ def get_repo(path: Path) -> Repo:
         raise GitError(f"Cannot find a git repository at or above {path}") from exc
 
 
-def get_api_at_ref(repo: Repo, ref: str, src_path: str = "src") -> dict[str, list[str]] | None:
+def get_api_at_ref(repo: Repo, ref: str, src_path: str = "src") -> ApiSurface | None:
     """Extract the public API at a git ref.
 
     The function uses ``git archive`` to write only ``src_path`` to a temporary
@@ -194,7 +178,7 @@ def get_api_at_ref(repo: Repo, ref: str, src_path: str = "src") -> dict[str, lis
         src_path: The directory in the repository that contains the Python packages.
 
     Returns:
-        A dict from each full module name to its sorted public names. The module names
+        A dict from each full module name to its iceberg ``Module``. The module names
         are relative to ``src_path``. ``None`` if ``src_path`` does not exist at ``ref``.
 
     Raises:
@@ -242,7 +226,7 @@ def get_changed_paths(repo: Repo, base_ref: str, head_ref: str) -> list[str]:
     return paths
 
 
-def get_api_at_index(repo: Repo, src_path: str = "src") -> dict[str, list[str]] | None:
+def get_api_at_index(repo: Repo, src_path: str = "src") -> ApiSurface | None:
     """Extract the public API from the git staging area (the index).
 
     The function writes the staged tree with ``git write-tree``. Then it uses
@@ -254,7 +238,7 @@ def get_api_at_index(repo: Repo, src_path: str = "src") -> dict[str, list[str]] 
         src_path: The directory in the repository that contains the Python packages.
 
     Returns:
-        A dict from each full module name to its sorted public names. The module names
+        A dict from each full module name to its iceberg ``Module``. The module names
         are relative to ``src_path``. ``None`` if ``src_path`` does not exist in the
         staging area.
 

@@ -23,7 +23,8 @@ diffract v1.2.0 HEAD --json
         "module": "sheridan.diffract",
         "name": "OldHelper"
       }
-    ]
+    ],
+    "changed": []
   }
 }
 ```
@@ -37,8 +38,9 @@ diffract v1.2.0 HEAD --json
 | `summary` | string | A description of the change for people. Do not parse it. |
 | `base_ref` | string | The earlier ref, as you gave it. |
 | `head_ref` | string | The later ref, as you gave it. For the staging area, the value is `:staged`. |
-| `diff.added` | list | The added public names. Each item has the keys `module` and `name`. |
+| `diff.added` | list | The added public names. Each item has the keys `module` and `name`. A class member has the class name in front of it, for example `ApiDiff.changed`. |
 | `diff.removed` | list | The removed public names. Each item has the keys `module` and `name`. |
+| `diff.changed` | list | The changes to the public names that are at the two refs. Each item has the keys `module`, `name`, `detail` (a description of the change) and `breaking` (`true` or `false`). Read [API changes](api-changes.md). |
 
 ## Exit code
 

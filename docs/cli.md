@@ -61,7 +61,24 @@ Removed public names:
 Suggested commit prefix: feat!:
 ```
 
-For added names, diffract writes the names with a `+`. diffract shows a suggested prefix
+For added names, diffract writes the names with a `+`. For a breaking change to a name,
+diffract writes the change with a `!`. For a change that adds to a name, it writes the
+change with a `~`:
+
+```
+Detected: feat!  (breaking change)
+
+Breaking changes:
+  sheridan.diffract:
+    ! check: parameter 'ref' was removed
+Changes that add to public names:
+  sheridan.diffract:
+    ~ check: optional parameter 'strict' was added
+
+Suggested commit prefix: feat!:
+```
+
+[API changes](api-changes.md) lists the changes that diffract finds. diffract shows a suggested prefix
 only for `feat!` and `feat`. For the other groups, it shows the possible types. For
 example, if no public name changed and no Python file changed, diffract writes this:
 
@@ -78,8 +95,8 @@ This can be a docs, ci, chore or build commit.
 | Code | Meaning |
 |---|---|
 | `0` | No public name changed, or the command has no `--exit-code` flag. |
-| `1` | With `--exit-code`, a public name was removed. With `--validate-msg-file`, the commit type in the message is not possible for the change. |
-| `2` | With `--exit-code`, a public name was added and no public name was removed. |
+| `1` | With `--exit-code`, a public name was removed or had a breaking change. With `--validate-msg-file`, the commit type in the message is not possible for the change. |
+| `2` | With `--exit-code`, a public name was added or had a change that adds to it, and no breaking change occurred. |
 | `3` | An error. This can be a usage error, a git, file or configuration error, or an unexpected error. |
 
 The default exit code of `argparse` for a usage error is 2. diffract uses 3 for a usage

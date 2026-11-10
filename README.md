@@ -9,19 +9,20 @@ diffract supports only Python 3.14 and later.
 ## How it works
 
 1. diffract uses [sheridan-iceberg](https://github.com/andrewasheridan/iceberg) to get the public API at two points in the git history.
-2. It compares the two APIs to find the names that were added or removed.
+2. It compares the two APIs to find the names that were added or removed. For the names at the two refs, it compares the parameters of the functions and the bases and members of the classes.
 3. It gives the group of Conventional Commit types that are possible for the change. The first rule that applies gives the result:
 
 | Change | Group | Possible types |
 |---|---|---|
-| A public name was removed | `feat!` | `feat!` (breaking) |
-| A public name was added | `feat` | `feat` |
+| A public name was removed, or had a breaking change (for example, a parameter was removed) | `feat!` | `feat!` (breaking) |
+| A public name was added, or had a change that adds to it (for example, a new optional parameter) | `feat` | `feat` |
 | A `.py` or `.pyi` file in the source directory changed, and no public name changed | `code` | `fix`, `refactor`, `perf`, `style` |
 | A `.py` or `.pyi` file in the test directory changed | `test` | `test` |
 | All other changes | `other` | `docs`, `ci`, `chore`, `build` |
 
-diffract compares only names and file paths. Thus it cannot tell a fix from a refactor,
-or `docs` from `ci`. It tells you only which types are possible.
+diffract compares only the public API and the file paths. Thus it cannot tell a fix from a
+refactor, or `docs` from `ci`. It tells you only which types are possible. The
+[API changes](https://andrewasheridan.github.io/diffract/api-changes/) page lists the changes that diffract finds.
 
 The source directory is `src` and the test directory is `tests` by default. A file in the
 test directory is a test file, also when the test directory is in the source directory
@@ -63,8 +64,8 @@ You can also run diffract as a module: `python -m sheridan.diffract`. The module
 **Exit codes:**
 
 - `0`: no change to the public API, or `--exit-code` is not set.
-- `1`: with `--exit-code`, a breaking change (a public name was removed). With `--validate-msg-file`, a commit message with a type that is not possible for the change.
-- `2`: with `--exit-code`, a change that is not breaking (a public name was added).
+- `1`: with `--exit-code`, a breaking change (a public name was removed, or had a breaking change). With `--validate-msg-file`, a commit message with a type that is not possible for the change.
+- `2`: with `--exit-code`, a change that is not breaking (a public name was added, or had a change that adds to it).
 - `3`: an error. This can be a usage error, a git, file or configuration error, or an unexpected error. For an unexpected error, diffract writes a short message with a link to the issue tracker.
 
 **Example output:**
@@ -122,8 +123,8 @@ print(result.commit_type)  # the group of the staged change, not of the last com
 
 | Change that diffract finds | Types that pass |
 |---|---|
-| A public name was removed (`feat!`) | Any type with a `!` or a `BREAKING CHANGE:` footer |
-| A public name was added (`feat`) | `feat`, or any type with a `!` or a `BREAKING CHANGE:` footer |
+| A public name was removed or had a breaking change (`feat!`) | Any type with a `!` or a `BREAKING CHANGE:` footer |
+| A public name was added or had a change that adds to it (`feat`) | `feat`, or any type with a `!` or a `BREAKING CHANGE:` footer |
 | Python files in the source directory changed (`code`) | `fix`, `refactor`, `perf`, `style` or `feat`, or any type with a `!` or a `BREAKING CHANGE:` footer |
 | Only Python files in the test directory changed (`test`) | `test` |
 | All other changes (`other`) | `docs`, `ci`, `chore` or `build` |
@@ -242,7 +243,7 @@ jobs:
 ## What it does not do
 
 - `diffract` has **no AST logic of its own**. `sheridan-iceberg` gets the public API.
-- It compares only public names (added names and removed names). It does not find **signature changes**, for example a new argument name or a new return type. iceberg gives lists of names, not signatures.
+- It does not compare **type annotations**, decorators or default values. For example, it does not find a new return type.
 - It does not change commits or the git history. It only tells you the result.
 
 ## Development
