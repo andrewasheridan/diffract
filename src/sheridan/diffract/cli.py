@@ -6,18 +6,18 @@ import argparse
 import json
 import re
 import sys
-from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import NoReturn, override
 
 from sheridan.diffract import __version__
 from sheridan.diffract.checker import check, check_staged
+from sheridan.diffract.classifier import group_by_module
 from sheridan.diffract.config import load_config
 from sheridan.diffract.enums import CommitType
 from sheridan.diffract.exceptions import DiffractError
 from sheridan.diffract.git_utils import get_repo
-from sheridan.diffract.models import ApiDiff, DiffractResult, NameChange
+from sheridan.diffract.models import ApiDiff, DiffractResult
 
 _COMMIT_TYPE_RE: re.Pattern[str] = re.compile(r"^(feat|fix|refactor)(\([^)]*\))?(!)?:")
 _BREAKING_FOOTER_RE: re.Pattern[str] = re.compile(r"^BREAKING[ -]CHANGE: ", re.MULTILINE)
@@ -130,21 +130,6 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _group_changes(changes: tuple[NameChange, ...]) -> dict[str, list[str]]:
-    """Group NameChange objects by module for display purposes.
-
-    Args:
-        changes: The name changes to group.
-
-    Returns:
-        A dict mapping module name to sorted list of public names.
-    """
-    grouped: dict[str, list[str]] = defaultdict(list)
-    for change in changes:
-        grouped[change.module].append(change.name)
-    return {mod: sorted(names) for mod, names in sorted(grouped.items())}
-
-
 def _format_human(result: DiffractResult, scope: str | None = None) -> str:
     """Format a DiffractResult as human-readable text.
 
@@ -173,13 +158,13 @@ def _format_human(result: DiffractResult, scope: str | None = None) -> str:
     else:
         if result.diff.removed:
             lines.append("Removed public names:")
-            for module, names in _group_changes(result.diff.removed).items():
+            for module, names in group_by_module(result.diff.removed).items():
                 lines.append(f"  {module}:")
                 for name in names:
                     lines.append(f"    - {name}")
         if result.diff.added:
             lines.append("Added public names:")
-            for module, names in _group_changes(result.diff.added).items():
+            for module, names in group_by_module(result.diff.added).items():
                 lines.append(f"  {module}:")
                 for name in names:
                     lines.append(f"    + {name}")

@@ -8,8 +8,10 @@ from sheridan.diffract.enums import CommitType
 from sheridan.diffract.models import ApiDiff, NameChange
 
 
-def _group_by_module(changes: tuple[NameChange, ...]) -> dict[str, list[str]]:
+def group_by_module(changes: tuple[NameChange, ...]) -> dict[str, list[str]]:
     """Group a sequence of NameChanges by their module name.
+
+    The classifier summary and the CLI output both use this function.
 
     Args:
         changes: The name changes to group.
@@ -32,7 +34,7 @@ def _format_grouped(changes: tuple[NameChange, ...]) -> str:
     Returns:
         A human-readable string listing each module and its changed names.
     """
-    grouped = _group_by_module(changes)
+    grouped = group_by_module(changes)
     lines: list[str] = []
     for module, names in grouped.items():
         lines.append(f"{module}: {', '.join(names)}")
