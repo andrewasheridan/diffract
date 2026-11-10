@@ -162,6 +162,43 @@ class TestMain:
         assert "no repo found" in capsys.readouterr().err
 
     @pytest.mark.parametrize(
+        "argv",
+        [
+            ["diffract", "--bogus"],
+            ["diffract", "a", "b", "c"],
+        ],
+    )
+    def test_usage_error_exits_three(
+        self,
+        argv: list[str],
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """'diffract' must print the usage and exit 3 on a usage error, not 2 as for an API change."""
+        monkeypatch.setattr(sys, "argv", argv)
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 3
+        assert "usage: diffract" in capsys.readouterr().err
+
+    def test_unexpected_error_exits_three(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        """'diffract' must print a short message with the issue tracker and exit 3 on an unexpected exception."""
+        monkeypatch.setattr(sys, "argv", ["diffract"])
+        mocker.patch("sheridan.diffract.cli.check", side_effect=RuntimeError("iceberg crashed"))
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 3
+        err = capsys.readouterr().err
+        assert "RuntimeError: iceberg crashed" in err
+        assert "https://github.com/andrewasheridan/diffract/issues" in err
+        assert "Traceback" not in err
+
+    @pytest.mark.parametrize(
         ("file_name", "content"),
         [
             ("diffract.toml", "src = 3\n"),

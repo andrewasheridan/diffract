@@ -44,11 +44,11 @@ diffract --json
 diffract --exit-code
 ```
 
-**Exit codes with `--exit-code`:**
-- `0` — no API surface changes
-- `1` — breaking change (public name removed)
-- `2` — non-breaking API change (public name added)
-- `3` — error (git or surface extraction failure)
+**Exit codes:**
+- `0` — no API surface changes, or `--exit-code` is not set
+- `1` — breaking change (public name removed) with `--exit-code`, or a commit message that tells less than the API change with `--validate-msg-file`
+- `2` — non-breaking API change (public name added) with `--exit-code`
+- `3` — error: a usage error, a git, file or config error, or an unexpected error. For an unexpected error, diffract writes a short message with a link to the issue tracker.
 
 **Example output:**
 
