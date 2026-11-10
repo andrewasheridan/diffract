@@ -225,6 +225,89 @@ class TestGetApiAtRef:
         assert get_api_at_ref(repo, "HEAD", src_path=".") == {"mypackage.mod": ["Bar", "Foo"]}
         assert captured == [tmp_path]
 
+    def test_archives_only_the_src_path(
+        self,
+        tmp_path: Path,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        """Must give the source directory to ``git archive`` as a pathspec."""
+        repo = MagicMock()
+        mock_tar_open = mocker.patch("sheridan.diffract.git_utils.tarfile.open")
+        mock_tmpdir = mocker.patch("sheridan.diffract.git_utils.tempfile.TemporaryDirectory")
+        mocker.patch("sheridan.diffract.git_utils.get_public_api", return_value=_container(tmp_path / "src"))
+        self._setup_archive_mocks(repo, tmp_path, mock_tmpdir, mock_tar_open)
+
+        get_api_at_ref(repo, "HEAD", src_path="src/")
+
+        repo.git.archive.assert_called_once_with("HEAD", "--", "src", format="tar", as_process=True)
+
+    def test_archives_the_full_tree_when_src_path_is_a_dot(
+        self,
+        tmp_path: Path,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        """Must not give a pathspec to ``git archive`` for the repository root."""
+        repo = MagicMock()
+        mock_tar_open = mocker.patch("sheridan.diffract.git_utils.tarfile.open")
+        mock_tmpdir = mocker.patch("sheridan.diffract.git_utils.tempfile.TemporaryDirectory")
+        mocker.patch("sheridan.diffract.git_utils.get_public_api", return_value=_container(tmp_path))
+        self._setup_archive_mocks(repo, tmp_path, mock_tmpdir, mock_tar_open)
+
+        get_api_at_ref(repo, "HEAD", src_path=".")
+
+        repo.git.archive.assert_called_once_with("HEAD", format="tar", as_process=True)
+        repo.git.ls_tree.assert_not_called()
+
+    def test_does_not_archive_when_src_path_is_not_in_the_tree(
+        self,
+        tmp_path: Path,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        """Must return None without ``git archive``, which fails for a pathspec that has no match."""
+        repo = MagicMock()
+        mock_tar_open = mocker.patch("sheridan.diffract.git_utils.tarfile.open")
+        mock_tmpdir = mocker.patch("sheridan.diffract.git_utils.tempfile.TemporaryDirectory")
+        self._setup_archive_mocks(repo, tmp_path, mock_tmpdir, mock_tar_open)
+        repo.git.ls_tree.return_value = ""
+
+        assert get_api_at_ref(repo, "HEAD", src_path="lib") is None
+        repo.git.archive.assert_not_called()
+
+    def test_raises_git_error_when_git_archive_fails(
+        self,
+        tmp_path: Path,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        """Must raise GitError when ``git archive`` exits with an error."""
+        from git import GitCommandError
+
+        repo = MagicMock()
+        mock_tar_open = mocker.patch("sheridan.diffract.git_utils.tarfile.open")
+        mock_tmpdir = mocker.patch("sheridan.diffract.git_utils.tempfile.TemporaryDirectory")
+        self._setup_archive_mocks(repo, tmp_path, mock_tmpdir, mock_tar_open)
+        repo.git.archive.return_value.wait.side_effect = GitCommandError(["git", "archive"], 128)
+
+        with pytest.raises(GitError, match="Cannot extract 'src' at 'HEAD'"):
+            get_api_at_ref(repo, "HEAD")
+
+    def test_raises_git_error_when_tar_refuses_a_member(
+        self,
+        tmp_path: Path,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        """Must raise GitError when the ``data`` filter refuses a file."""
+        import tarfile
+
+        repo = MagicMock()
+        mock_tar_open = mocker.patch("sheridan.diffract.git_utils.tarfile.open")
+        mock_tmpdir = mocker.patch("sheridan.diffract.git_utils.tempfile.TemporaryDirectory")
+        self._setup_archive_mocks(repo, tmp_path, mock_tmpdir, mock_tar_open)
+        refused = tarfile.AbsoluteLinkError(tarfile.TarInfo("src/link"))
+        mock_tar_open.return_value.__enter__.return_value.extractall.side_effect = refused
+
+        with pytest.raises(GitError, match="is a link to an absolute path"):
+            get_api_at_ref(repo, "HEAD")
+
 
 class TestGetApiAtIndex:
     """Tests for get_api_at_index()."""
@@ -275,7 +358,7 @@ class TestGetApiAtIndex:
 
         get_api_at_index(repo)
 
-        repo.git.archive.assert_called_once_with("deadbeef", format="tar", as_process=True)
+        repo.git.archive.assert_called_once_with("deadbeef", "--", "src", format="tar", as_process=True)
 
     def test_raises_surface_error_when_iceberg_fails(
         self,
