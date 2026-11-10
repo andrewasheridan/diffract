@@ -1,4 +1,4 @@
-"""Run the real CLI and iceberg on temporary repositories: classification, ``--json`` and ``--exit-code``."""
+"""Run the real CLI and iceberg on temporary repositories: commit types, ``--json`` and ``--exit-code``."""
 
 import json
 
@@ -12,7 +12,7 @@ INTERNAL = INITIAL_PACKAGE.replace("return 2", "return 2 + _offset()") + "\n\nde
 
 
 def _json(repo: GitRepo, *args: str) -> dict[str, object]:
-    """Run ``diffract --json`` and return the parsed output."""
+    """Run ``diffract --json`` and parse the output."""
     proc = repo.diffract("--json", *args)
     assert proc.returncode == 0, proc.stderr
     data: dict[str, object] = json.loads(proc.stdout)
@@ -96,11 +96,11 @@ def test_unknown_ref_exits_3(repo: GitRepo) -> None:
     proc = repo.diffract("no-such-ref", "HEAD", "--exit-code")
 
     assert proc.returncode == 3
-    assert "Error: Unknown ref: no-such-ref" in proc.stderr
+    assert "Error: The ref does not exist: no-such-ref" in proc.stderr
 
 
 def test_src_flag_and_config_files(repo: GitRepo) -> None:
-    """``--src`` beats ``diffract.toml``, which beats ``pyproject.toml``, which beats ``src/``."""
+    """``--src`` has priority over ``diffract.toml``, then ``pyproject.toml``, then ``src/``."""
     repo.write("lib/other/__init__.py", '__all__ = ["one"]\n\n\ndef one() -> int:\n    return 1\n')
     repo.write("python/src/third/__init__.py", '__all__ = ["x"]\n\n\ndef x() -> int:\n    return 1\n')
     repo.commit("add the other layouts")

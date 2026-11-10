@@ -29,7 +29,7 @@ def _make_result(
     base_ref: str = "HEAD~1",
     head_ref: str = "HEAD",
 ) -> DiffractResult:
-    """Construct a DiffractResult for use in tests."""
+    """Build a DiffractResult for the tests."""
     return DiffractResult(
         commit_type=commit_type,
         summary=summary,
@@ -43,35 +43,35 @@ class TestFormatHuman:
     """Tests for _format_human()."""
 
     def test_no_changes_output(self) -> None:
-        """Output for a fix result must state no public API changes."""
+        """The output for a fix result must say that the public API did not change."""
         result = _make_result(CommitType.fix, ApiDiff(added=(), removed=()))
         output = _format_human(result)
-        assert "No public API changes detected." in output
+        assert "The public API did not change." in output
         assert "fix:" in output
 
     def test_breaking_change_output(self, removal_diff: ApiDiff) -> None:
-        """Output for a feat! result must state it is a breaking change."""
+        """The output for a feat! result must say that it is a breaking change."""
         result = _make_result(CommitType.feat_breaking, removal_diff)
         output = _format_human(result)
         assert "breaking change" in output
         assert "feat!:" in output
 
     def test_addition_output_lists_names(self, addition_diff: ApiDiff) -> None:
-        """Output for a feat result must list the added public names."""
+        """The output for a feat result must list the added public names."""
         result = _make_result(CommitType.feat, addition_diff)
         output = _format_human(result)
         assert "Added public names" in output
         assert "NewClass" in output
 
     def test_removal_output_lists_names(self, removal_diff: ApiDiff) -> None:
-        """Output for a feat! result must list the removed public names."""
+        """The output for a feat! result must list the removed public names."""
         result = _make_result(CommitType.feat_breaking, removal_diff)
         output = _format_human(result)
         assert "Removed public names" in output
         assert "OldClass" in output
 
     def test_refactor_output(self, empty_diff: ApiDiff) -> None:
-        """Output for a refactor result must state no API changes."""
+        """The output for a refactor result must say that the public API did not change."""
         result = _make_result(CommitType.refactor, empty_diff)
         output = _format_human(result)
         assert "refactor:" in output
@@ -81,28 +81,28 @@ class TestResolveExitCode:
     """Tests for _resolve_exit_code()."""
 
     def test_always_zero_without_flag(self, removal_diff: ApiDiff) -> None:
-        """Without --exit-code, exit code must always be 0 regardless of result."""
+        """Without --exit-code, the exit code must always be 0."""
         result = _make_result(CommitType.feat_breaking, removal_diff)
         assert _resolve_exit_code(result, use_exit_code=False) == 0
 
     def test_one_for_breaking_with_flag(self, removal_diff: ApiDiff) -> None:
-        """With --exit-code, breaking changes must produce exit code 1."""
+        """With --exit-code, a breaking change must give exit code 1."""
         result = _make_result(CommitType.feat_breaking, removal_diff)
         assert _resolve_exit_code(result, use_exit_code=True) == 1
 
     def test_two_for_non_breaking_api_change_with_flag(self, addition_diff: ApiDiff) -> None:
-        """With --exit-code, non-breaking API changes must produce exit code 2."""
+        """With --exit-code, an API change that is not breaking must give exit code 2."""
         result = _make_result(CommitType.feat, addition_diff)
         assert _resolve_exit_code(result, use_exit_code=True) == 2
 
     def test_zero_for_no_changes_with_flag(self, empty_diff: ApiDiff) -> None:
-        """With --exit-code, no changes must produce exit code 0."""
+        """With --exit-code, no change must give exit code 0."""
         result = _make_result(CommitType.fix, empty_diff)
         assert _resolve_exit_code(result, use_exit_code=True) == 0
 
 
 class TestMain:
-    """Integration tests for the main() CLI entrypoint."""
+    """Integration tests for main()."""
 
     def test_version_flag_exits_zero(
         self,
@@ -121,7 +121,7 @@ class TestMain:
         capsys: pytest.CaptureFixture[str],
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """'diffract' must print human-readable output and exit 0 by default."""
+        """'diffract' must print text and exit 0 by default."""
         result = _make_result(CommitType.fix, empty_diff)
         monkeypatch.setattr(sys, "argv", ["diffract"])
         mocker.patch("sheridan.diffract.cli.check", return_value=result)
@@ -137,7 +137,7 @@ class TestMain:
         capsys: pytest.CaptureFixture[str],
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """'diffract --json' must emit valid JSON to stdout."""
+        """'diffract --json' must write correct JSON to stdout."""
         result = _make_result(CommitType.fix, empty_diff)
         monkeypatch.setattr(sys, "argv", ["diffract", "--json"])
         mocker.patch("sheridan.diffract.cli.check", return_value=result)
@@ -153,7 +153,7 @@ class TestMain:
         capsys: pytest.CaptureFixture[str],
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """'diffract' must print to stderr and exit 3 on DiffractError."""
+        """'diffract' must print to stderr and exit 3 for a DiffractError."""
         monkeypatch.setattr(sys, "argv", ["diffract"])
         mocker.patch("sheridan.diffract.cli.check", side_effect=GitError("no repo found"))
         with pytest.raises(SystemExit) as exc_info:
@@ -174,7 +174,7 @@ class TestMain:
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """'diffract' must print the usage and exit 3 on a usage error, not 2 as for an API change."""
+        """'diffract' must print the usage and exit 3 for a usage error, not 2 as for an API change."""
         monkeypatch.setattr(sys, "argv", argv)
         with pytest.raises(SystemExit) as exc_info:
             main()
@@ -187,7 +187,7 @@ class TestMain:
         capsys: pytest.CaptureFixture[str],
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """'diffract' must print a short message with the issue tracker and exit 3 on an unexpected exception."""
+        """'diffract' must print a short message with the issue tracker and exit 3 for an unexpected exception."""
         monkeypatch.setattr(sys, "argv", ["diffract"])
         mocker.patch("sheridan.diffract.cli.check", side_effect=RuntimeError("iceberg crashed"))
         with pytest.raises(SystemExit) as exc_info:
@@ -213,7 +213,7 @@ class TestMain:
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """'diffract' must print an error without a traceback and exit 3 if the config file is not valid."""
+        """'diffract' must print an error without a traceback and exit 3 if the configuration file is not correct."""
         (tmp_path / file_name).write_text(content, encoding="utf-8")
         monkeypatch.chdir(tmp_path)
         monkeypatch.setattr(sys, "argv", ["diffract"])
@@ -232,7 +232,7 @@ class TestMain:
         capsys: pytest.CaptureFixture[str],
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """'diffract --exit-code' must exit 1 for breaking changes."""
+        """'diffract --exit-code' must exit 1 for a breaking change."""
         result = _make_result(CommitType.feat_breaking, removal_diff)
         monkeypatch.setattr(sys, "argv", ["diffract", "--exit-code"])
         mocker.patch("sheridan.diffract.cli.check", return_value=result)
@@ -247,7 +247,7 @@ class TestMain:
         capsys: pytest.CaptureFixture[str],
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """'diffract --exit-code' must exit 2 for non-breaking API changes."""
+        """'diffract --exit-code' must exit 2 for an API change that is not breaking."""
         result = _make_result(CommitType.feat, addition_diff)
         monkeypatch.setattr(sys, "argv", ["diffract", "--exit-code"])
         mocker.patch("sheridan.diffract.cli.check", return_value=result)
@@ -262,7 +262,7 @@ class TestMain:
         capsys: pytest.CaptureFixture[str],
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """'diffract' must forward positional refs and --src to check()."""
+        """'diffract' must give the positional refs and --src to check()."""
         result = _make_result(CommitType.fix, empty_diff, base_ref="v1.0", head_ref="v2.0")
         monkeypatch.setattr(sys, "argv", ["diffract", "v1.0", "v2.0", "--src", "lib"])
         mock_check = mocker.patch("sheridan.diffract.cli.check", return_value=result)
@@ -281,7 +281,7 @@ class TestMain:
         capsys: pytest.CaptureFixture[str],
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """Output for a mixed diff must show both Removed and Added sections."""
+        """The output for removed and added names must show the two lists."""
         result = _make_result(CommitType.feat_breaking, mixed_diff)
         monkeypatch.setattr(sys, "argv", ["diffract"])
         mocker.patch("sheridan.diffract.cli.check", return_value=result)
@@ -298,7 +298,7 @@ class TestMain:
         capsys: pytest.CaptureFixture[str],
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """main() must use the config file's src when --src is not provided."""
+        """main() must use src from the configuration file if there is no --src."""
         result = _make_result(CommitType.fix, empty_diff)
         monkeypatch.setattr(sys, "argv", ["diffract"])
         mocker.patch("sheridan.diffract.cli.load_config", return_value=DiffractConfig(src="python/src"))
@@ -315,7 +315,7 @@ class TestMain:
         capsys: pytest.CaptureFixture[str],
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """main() must use --src over the config file value when both are present."""
+        """main() must use --src, not the value in the configuration file."""
         result = _make_result(CommitType.fix, empty_diff)
         monkeypatch.setattr(sys, "argv", ["diffract", "--src", "cli-src"])
         mocker.patch("sheridan.diffract.cli.load_config", return_value=DiffractConfig(src="config-src"))
@@ -332,7 +332,7 @@ class TestMain:
         capsys: pytest.CaptureFixture[str],
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """main() must fall back to 'src' when neither --src nor config provides a value."""
+        """main() must use 'src' if --src and the configuration file give no value."""
         result = _make_result(CommitType.fix, empty_diff)
         monkeypatch.setattr(sys, "argv", ["diffract"])
         mocker.patch("sheridan.diffract.cli.load_config", return_value=DiffractConfig())
@@ -374,7 +374,7 @@ class TestParseWrittenType:
 
 
 class TestTellsLessThan:
-    """Unit tests for _tells_less_than(): the message fails only when it hides an API change."""
+    """Unit tests for _tells_less_than(): the message fails only if it hides an API change."""
 
     @pytest.mark.parametrize("message", ["feat: x", "feat!: x", "fix: x", "fix!: x", "refactor: x", "refactor!: x"])
     def test_no_name_change_always_passes(self, message: str, empty_diff: ApiDiff) -> None:
@@ -787,7 +787,7 @@ class TestFormatCommitType:
 
 
 class TestScopedValidateMsgFile:
-    """Tests that scope is preserved in written/suggested commit type output."""
+    """Tests that the output keeps the scope in the written and the suggested commit type."""
 
     def test_mismatch_with_scope_shows_scope_in_written_and_detected(
         self,
@@ -797,7 +797,7 @@ class TestScopedValidateMsgFile:
         capsys: pytest.CaptureFixture[str],
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """fix(parser): mismatch against feat should show fix(parser): and feat(parser): in stderr."""
+        """For fix(parser): and a feat result, stderr must show fix(parser): and feat(parser):."""
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("fix(parser): correct something\n", encoding="utf-8")
         result = _make_result(CommitType.feat, addition_diff)
@@ -818,7 +818,7 @@ class TestScopedValidateMsgFile:
         capsys: pytest.CaptureFixture[str],
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """Suggested commit prefix in _format_human output should include scope."""
+        """The suggested commit prefix in the _format_human output must have the scope."""
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("fix(api): nothing\n", encoding="utf-8")
         result = _make_result(CommitType.feat, addition_diff)
@@ -838,7 +838,7 @@ class TestScopedValidateMsgFile:
         capsys: pytest.CaptureFixture[str],
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """fix(core): mismatch against feat! should show feat(core)!: as detected."""
+        """For fix(core): and a feat! result, stderr must show feat(core)!: as the detected type."""
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("fix(core): correct something\n", encoding="utf-8")
         result = _make_result(CommitType.feat_breaking, removal_diff)
@@ -858,7 +858,7 @@ class TestScopedValidateMsgFile:
         monkeypatch: pytest.MonkeyPatch,
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """Regex must not care about scope: feat(any-scope): should still classify as feat."""
+        """The scope has no effect on the type: feat(any-scope): is a feat type."""
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("feat(completely-irrelevant-scope): add\n", encoding="utf-8")
         result = _make_result(CommitType.feat, addition_diff)
@@ -875,7 +875,7 @@ class TestScopedValidateMsgFile:
         monkeypatch: pytest.MonkeyPatch,
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """fix(scope): matching fix result should exit 0."""
+        """fix(scope): for a fix result must exit 0."""
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("fix(scope): patch something\n", encoding="utf-8")
         result = _make_result(CommitType.fix, empty_diff)
@@ -887,7 +887,7 @@ class TestScopedValidateMsgFile:
 
 
 class TestValidateMsgFileRouting:
-    """Tests for check_staged vs check routing in main() when --validate-msg-file is used."""
+    """Tests that main() calls check_staged or check correctly with --validate-msg-file."""
 
     def test_validate_msg_file_without_refs_calls_check_staged(
         self,
@@ -999,8 +999,7 @@ class TestValidateMsgFileRouting:
         result = _make_result(CommitType.fix, empty_diff)
         mock_check_staged = mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
         mock_check = mocker.patch("sheridan.diffract.cli.check", return_value=result)
-        # Only one positional ref — head_ref will be None, but base_ref is set,
-        # so the condition (base_ref is None AND head_ref is None) is False.
+        # base_ref is set and head_ref is None. Thus diffract does not compare with the staging area.
         monkeypatch.setattr(
             sys,
             "argv",

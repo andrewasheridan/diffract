@@ -74,7 +74,7 @@ Suggested commit prefix: feat!:
 ```
 Detected: fix
 
-No public API changes detected.
+The public API did not change.
 
 Suggested commit prefix: fix:
 ```

@@ -24,7 +24,7 @@ _ALLOWED_DOT_DIRS = frozenset({".github"})
 
 
 def _is_skipped_dir(name: str) -> bool:
-    """Check if a directory name is a cache, build output or hidden directory."""
+    """Find if a directory name is a cache, a build output or a hidden directory."""
     if name in _SKIP_DIRS:
         return True
 
@@ -32,7 +32,7 @@ def _is_skipped_dir(name: str) -> bool:
 
 
 def _source_files(root: Path) -> Iterator[Path]:
-    """Yield the files below *root* to scan. Skip virtualenvs, caches and build output."""
+    """Find the files below *root* to scan. Skip virtual environments, caches and build output."""
     for path in sorted(root.rglob("*")):
         if not path.is_file() or path.suffix not in _SUFFIXES:
             continue

@@ -1,4 +1,4 @@
-"""Shared pytest fixtures for sheridan-diffract tests."""
+"""The pytest fixtures for the unit tests."""
 
 import pytest
 
@@ -32,7 +32,7 @@ def removal_diff() -> ApiDiff:
 
 @pytest.fixture()
 def mixed_diff() -> ApiDiff:
-    """Build an ApiDiff with both added and removed names."""
+    """Build an ApiDiff with added names and removed names."""
     return ApiDiff(
         added=(NameChange(module="mypackage.mod", name="NewClass", kind=ChangeKind.added),),
         removed=(NameChange(module="mypackage.mod", name="OldClass", kind=ChangeKind.removed),),

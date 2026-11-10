@@ -1,4 +1,4 @@
-"""API surface diffing for sheridan-diffract."""
+"""Compare the public API at two refs."""
 
 __all__ = ["diff_surfaces"]
 
@@ -10,21 +10,18 @@ def diff_surfaces(
     base: dict[str, list[str]],
     head: dict[str, list[str]],
 ) -> ApiDiff:
-    """Compare two API surfaces and return added/removed NameChanges.
+    """Compare two public APIs and find the added and the removed names.
 
-    Iterates over every module present in either surface and computes the
-    symmetric difference of its public names. Results are sorted by
-    ``(module, name)``.
+    The function compares the public names of each module that is in one of the two
+    APIs. It sorts the changes by ``(module, name)``.
 
     Args:
-        base: The API surface at the earlier ref, as returned by
-            ``sheridan.iceberg.get_public_api``.
-        head: The API surface at the later ref, as returned by
-            ``sheridan.iceberg.get_public_api``.
+        base: The public API at the earlier ref, as a dict from each module name to
+            its public names.
+        head: The public API at the later ref, in the same format.
 
     Returns:
-        An :class:`ApiDiff` containing tuples of :class:`NameChange` objects
-        for all names that were added or removed.
+        An :class:`ApiDiff` with a :class:`NameChange` for each added or removed name.
     """
     all_modules = set(base) | set(head)
     added: list[NameChange] = []

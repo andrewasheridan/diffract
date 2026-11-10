@@ -1,4 +1,4 @@
-"""Enumerations for sheridan-diffract."""
+"""The enumerations of sheridan-diffract."""
 
 __all__ = [
     "ChangeKind",
@@ -9,13 +9,13 @@ from enum import StrEnum
 
 
 class CommitType(StrEnum):
-    """Conventional-commit type produced by diffract.
+    """The Conventional Commit type that diffract gives.
 
     Attributes:
-        feat: A backwards-compatible addition was detected.
-        feat_breaking: A breaking change (removal) was detected.
-        fix: No API surface changes were detected.
-        refactor: Internal Python changes only; public API surface unchanged.
+        feat: A public name was added, and no public name was removed.
+        feat_breaking: A public name was removed. This is a breaking change.
+        fix: The public API did not change, and no Python file changed.
+        refactor: Python files changed, but the public API did not change.
     """
 
     feat = "feat"
@@ -28,8 +28,8 @@ class ChangeKind(StrEnum):
     """Whether a public name was added or removed.
 
     Attributes:
-        added: The name appeared in head but not in base.
-        removed: The name appeared in base but not in head.
+        added: The name is in head but not in base.
+        removed: The name is in base but not in head.
     """
 
     added = "added"

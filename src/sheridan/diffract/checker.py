@@ -1,4 +1,4 @@
-"""High-level API entry point for sheridan-diffract."""
+"""Connect the git, extract, diff and classify steps of sheridan-diffract."""
 
 __all__ = ["check", "check_staged"]
 
@@ -61,22 +61,22 @@ def check(
     repo_path: Path | None = None,
     src_path: str = "src",
 ) -> DiffractResult:
-    """Detect API changes between two git refs and classify the commit type.
+    """Find the public API changes between two git refs and give the commit type.
 
     Args:
-        base_ref: The earlier git ref (default: ``HEAD~1``).
-        head_ref: The later git ref (default: ``HEAD``).
-        repo_path: Path to (or inside) the git repository. Defaults to the
-            current working directory.
-        src_path: Subdirectory within the repo to scan for Python packages.
+        base_ref: The earlier git ref. The default is ``HEAD~1``.
+        head_ref: The later git ref. The default is ``HEAD``.
+        repo_path: The path of the git repository, or of a directory in it. The
+            default is the current working directory.
+        src_path: The directory in the repository that contains the Python packages.
 
     Returns:
-        A :class:`~sheridan.diffract.models.DiffractResult` describing the
-        commit type, a human-readable summary, and the full API diff.
+        A :class:`~sheridan.diffract.models.DiffractResult` with the commit type, a
+        summary and the full API diff.
 
     Raises:
-        GitError: If the repository cannot be found or either ref is invalid.
-        SurfaceError: If API surface extraction fails for either ref, or if
+        GitError: If diffract cannot find the repository, or if a ref is not correct.
+        SurfaceError: If diffract cannot extract the public API at a ref, or if
             ``src_path`` does not exist at the two refs.
     """
     resolved_path = repo_path if repo_path is not None else Path.cwd()
@@ -107,32 +107,31 @@ def check_staged(
     repo_path: Path | None = None,
     src_path: str = "src",
 ) -> DiffractResult:
-    """Detect API changes between HEAD and the git staging area and classify the commit type.
+    """Find the public API changes between HEAD and the staging area and give the commit type.
 
-    Intended for use in commit-msg hooks, where the working tree is not yet
-    committed. Compares the public API at ``HEAD`` against the public API
-    materialised from the current index (staged files).
+    Use this function in a ``commit-msg`` hook, before git makes the commit. The
+    function compares the public API at ``HEAD`` with the public API of the files in
+    the staging area (the index).
 
     Args:
-        repo_path: Path to (or inside) the git repository. Defaults to the
-            current working directory.
-        src_path: Subdirectory within the repo to scan for Python packages.
+        repo_path: The path of the git repository, or of a directory in it. The
+            default is the current working directory.
+        src_path: The directory in the repository that contains the Python packages.
 
     Returns:
-        A :class:`~sheridan.diffract.models.DiffractResult` describing the
-        commit type, a human-readable summary, and the full API diff.
-        The ``base_ref`` field is set to ``"HEAD"`` and ``head_ref`` is set
-        to ``":staged"``.
+        A :class:`~sheridan.diffract.models.DiffractResult` with the commit type, a
+        summary and the full API diff. ``base_ref`` is ``"HEAD"`` and ``head_ref``
+        is ``":staged"``.
 
     Raises:
-        GitError: If the repository cannot be found.
-        SurfaceError: If API surface extraction fails for the index, or if
-            ``src_path`` does not exist at ``HEAD`` and in the staging area.
+        GitError: If diffract cannot find the repository.
+        SurfaceError: If diffract cannot extract the public API of the staging area,
+            or if ``src_path`` does not exist at ``HEAD`` and in the staging area.
     """
     resolved_path = repo_path if repo_path is not None else Path.cwd()
     repo = get_repo(resolved_path)
 
-    # initial commit — no prior surface
+    # Before the first commit, HEAD has no API.
     base = get_api_at_ref(repo, "HEAD", src_path=src_path) if repo.head.is_valid() else {}
     base_surface, head_surface = _resolve_surfaces(
         base,
@@ -151,5 +150,5 @@ def check_staged(
         summary=summary,
         diff=diff,
         base_ref="HEAD",
-        head_ref=":staged",  # sentinel — not a real git ref
+        head_ref=":staged",  # This is not a git ref. It is a label for the staging area.
     )

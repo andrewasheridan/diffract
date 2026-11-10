@@ -1,4 +1,4 @@
-"""Command-line interface for sheridan-diffract."""
+"""The ``diffract`` command."""
 
 __all__ = ["main"]
 
@@ -59,14 +59,14 @@ class _ArgumentParser(argparse.ArgumentParser):
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    """Construct and return the argument parser for the diffract CLI.
+    """Make the argument parser for the ``diffract`` command.
 
     Returns:
-        A fully-configured :class:`argparse.ArgumentParser` instance.
+        The argument parser, with all the arguments of the command.
     """
     parser = _ArgumentParser(
         prog="diffract",
-        description="Detect public API changes between git refs and suggest a commit type.",
+        description="Find the public API changes between two git refs and suggest a commit type.",
     )
     parser.add_argument(
         "--version",
@@ -80,8 +80,8 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="BASE_REF",
         help=(
             "The earlier git ref to compare (default: HEAD~1). "
-            "When --validate-msg-file is used without explicit refs, "
-            "diffract automatically compares HEAD vs the staging area."
+            "If you use --validate-msg-file and give no refs, "
+            "diffract compares HEAD with the staging area."
         ),
     )
     parser.add_argument(
@@ -91,9 +91,9 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="HEAD_REF",
         help=(
             "The later git ref to compare (default: HEAD). "
-            "If only BASE_REF is given, HEAD is used as HEAD_REF. "
-            "When --validate-msg-file is used without explicit refs, "
-            "diffract automatically compares HEAD vs the staging area."
+            "If you give only BASE_REF, diffract uses HEAD as HEAD_REF. "
+            "If you use --validate-msg-file and give no refs, "
+            "diffract compares HEAD with the staging area."
         ),
     )
     parser.add_argument(
@@ -101,29 +101,29 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="SRC",
         dest="src_path",
-        help="Source directory within the repository to scan (default: src).",
+        help="The directory in the repository that contains the Python packages (default: src).",
     )
     parser.add_argument(
         "--json",
         action="store_true",
         dest="output_json",
-        help="Emit JSON to stdout instead of human-readable text.",
+        help="Write JSON to stdout, not text.",
     )
     parser.add_argument(
         "--exit-code",
         action="store_true",
         dest="exit_code",
-        help="Exit 1 for breaking changes, 2 for any API change, 0 otherwise.",
+        help="Exit 1 if a public name was removed, 2 if a public name was added, and 0 if no public name changed.",
     )
     parser.add_argument(
         "--validate-msg-file",
         dest="validate_msg_file",
         metavar="MSGFILE",
         help=(
-            "Path to a commit message file. The check fails only if the message tells less "
+            "The path of a commit message file. The check fails only if the message tells less "
             "than the API change: removed public names need a '!' or a 'BREAKING CHANGE:' "
             "footer, and added public names need 'feat' or a '!'. "
-            "Types other than feat, fix and refactor are not checked."
+            "diffract does not check types other than feat, fix and refactor."
         ),
     )
 
@@ -131,16 +131,16 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _format_human(result: DiffractResult, scope: str | None = None) -> str:
-    """Format a DiffractResult as human-readable text.
+    """Write a ``DiffractResult`` as text for a terminal.
 
     Args:
-        result: The diffract result to format.
-        scope: Optional conventional-commit scope (without parentheses) to
-            include in the suggested commit prefix, e.g. ``"api"`` produces
-            ``"feat(api):"`` instead of ``"feat:"``.
+        result: The diffract result to write.
+        scope: The Conventional Commit scope for the suggested commit prefix, without
+            parentheses, or ``None``. For example, ``"api"`` gives ``"feat(api):"``,
+            not ``"feat:"``.
 
     Returns:
-        A multi-line string suitable for printing to a terminal.
+        The text, in one or more lines.
     """
     lines: list[str] = []
     commit_label = str(result.commit_type)
@@ -154,7 +154,7 @@ def _format_human(result: DiffractResult, scope: str | None = None) -> str:
     lines.append("")
 
     if result.diff.is_empty:
-        lines.append("No public API changes detected.")
+        lines.append("The public API did not change.")
     else:
         if result.diff.removed:
             lines.append("Removed public names:")
@@ -176,15 +176,16 @@ def _format_human(result: DiffractResult, scope: str | None = None) -> str:
 
 
 def _resolve_exit_code(result: DiffractResult, use_exit_code: bool) -> int:
-    """Determine the process exit code based on the result and flag.
+    """Find the exit code for a result.
 
     Args:
         result: The diffract result.
-        use_exit_code: Whether the ``--exit-code`` flag was passed.
+        use_exit_code: True if the command has the ``--exit-code`` flag.
 
     Returns:
-        ``0`` normally; ``1`` for breaking changes, ``2`` for any API change,
-        when ``use_exit_code`` is ``True``.
+        ``0`` if ``use_exit_code`` is ``False``. If ``use_exit_code`` is ``True``:
+        ``1`` if a public name was removed, ``2`` if a public name was added, and
+        ``0`` if no public name changed.
     """
     if not use_exit_code:
         return 0
@@ -196,10 +197,10 @@ def _resolve_exit_code(result: DiffractResult, use_exit_code: bool) -> int:
 
 
 def _parse_written_type(message: str) -> _WrittenType | None:
-    """Parse the conventional commit type from a commit message.
+    """Parse the Conventional Commit type from a commit message.
 
-    Only ``feat``, ``fix`` and ``refactor`` (with or without a scope and a ``!``) are
-    recognised. Other types, for example ``docs:`` or ``chore:``, give ``None`` so that
+    The function knows only ``feat``, ``fix`` and ``refactor``, with or without a scope
+    and a ``!``. Other types, for example ``docs:`` or ``chore:``, give ``None``. Thus
     diffract never blocks them.
 
     Args:
@@ -207,7 +208,7 @@ def _parse_written_type(message: str) -> _WrittenType | None:
             ``BREAKING CHANGE:`` or ``BREAKING-CHANGE:`` footer can be in the lines after it.
 
     Returns:
-        The written type, or ``None`` if the first line has no recognised type.
+        The written type, or ``None`` if the first line has no known type.
     """
     lines = message.splitlines()
     first_line = lines[0] if lines else ""
@@ -247,29 +248,29 @@ def _tells_less_than(written: _WrittenType, diff: ApiDiff) -> bool:
 
 
 def _extract_scope(first_line: str) -> str | None:
-    """Extract the optional scope from the first line of a commit message.
+    """Get the scope from the first line of a commit message.
 
     Args:
         first_line: The first line of the commit message.
 
     Returns:
-        The scope string without parentheses (e.g. ``"parser"`` from
-        ``"feat(parser): …"``), or ``None`` if no scope is present or
-        the line is not a recognised conventional-commit prefix.
+        The scope without parentheses, for example ``"parser"`` from
+        ``"feat(parser): …"``. ``None`` if the line has no scope, or if the line
+        does not start with a known Conventional Commit type.
     """
     m = _COMMIT_TYPE_RE.match(first_line)
     if m is None:
         return None
-    raw = m.group(2)  # e.g. "(parser)" or None
+    raw = m.group(2)
     return raw[1:-1] if raw is not None else None
 
 
 def _format_commit_type(commit_type: CommitType, scope: str | None) -> str:
-    """Render a commit type with an optional scope as a conventional-commit prefix.
+    """Write a commit type and a scope as a Conventional Commit prefix.
 
     Args:
-        commit_type: The commit type to render.
-        scope: An optional scope string (without parentheses).
+        commit_type: The commit type to write.
+        scope: The scope without parentheses, or ``None``.
 
     Returns:
         A string such as ``"feat:"``, ``"feat(api):"`` or ``"feat(api)!:"``.
@@ -282,31 +283,34 @@ def _format_commit_type(commit_type: CommitType, scope: str | None) -> str:
 
 
 def main() -> None:
-    """CLI entrypoint for diffract.
+    """Run the ``diffract`` command.
 
-    Loads configuration from config files (if present), parses command-line arguments,
-    and invokes the check() or check_staged() function to detect API changes. Outputs
-    results as human-readable text or JSON, and optionally validates commit message types.
+    The command reads the configuration files and the command-line arguments. Then it
+    calls ``check`` or ``check_staged`` to find the public API changes. It writes the
+    result as text or as JSON. With ``--validate-msg-file``, it checks the commit type
+    in a commit message.
 
-    When ``--validate-msg-file`` is provided without explicit BASE_REF/HEAD_REF positional
-    arguments, diffract automatically compares ``HEAD`` against the current staging area
-    via :func:`~sheridan.diffract.checker.check_staged`.
+    If you use ``--validate-msg-file`` and give no BASE_REF or HEAD_REF, the command
+    compares ``HEAD`` with the staging area. It uses
+    :func:`~sheridan.diffract.checker.check_staged` for this.
 
     An unexpected exception does not show a traceback. diffract writes a short message
     with a link to the issue tracker to stderr.
 
-    Exits with code:
-      - 0: No changes detected (or --exit-code not set)
-      - 1: Breaking changes detected (with --exit-code), or commit message mismatch
-      - 2: Non-breaking API changes detected (with --exit-code)
-      - 3: Error: a usage error, a git, file or config error, or an unexpected exception
+    The exit codes:
+      - 0: No public name changed, or the command has no ``--exit-code`` flag.
+      - 1: A public name was removed (with ``--exit-code``), or the commit message
+        tells less than the API change.
+      - 2: A public name was added and no public name was removed (with ``--exit-code``).
+      - 3: An error. This can be a usage error, a git, file or configuration error, or
+        an unexpected exception.
     """
     try:
         _run()
     except Exception as exc:  # Every unexpected error must exit 3, not 1.
         print(
             f"diffract: unexpected error: {type(exc).__name__}: {exc}\n"
-            f"This is a bug in diffract. Please report it at {_ISSUES_URL}",
+            f"This is a bug in diffract. Report it at {_ISSUES_URL}",
             file=sys.stderr,
         )
         sys.exit(_ERROR_EXIT_CODE)
@@ -318,16 +322,16 @@ def _run() -> None:
     args = parser.parse_args()
 
     repo_path = Path.cwd()
-    # Resolve the actual git repo root so load_config finds config files
-    # correctly even when diffract is invoked from a subdirectory.
+    # Find the root of the repository. Thus load_config finds the configuration files
+    # also when you start diffract in a subdirectory.
     try:
         repo_root = Path(get_repo(repo_path).working_dir)
     except DiffractError:
-        repo_root = repo_path  # no repo found; check() will raise the proper error
+        repo_root = repo_path  # No repository. check() will raise the correct error.
 
     try:
         config = load_config(repo_root)
-        # Priority: --src flag > config file > built-in default
+        # The --src flag has priority over the configuration file and the default.
         src_path: str = args.src_path or config.src or "src"
 
         if args.validate_msg_file is not None and not args.base_ref and not args.head_ref:
@@ -348,7 +352,7 @@ def _run() -> None:
         try:
             raw = msg_path.read_text(encoding="utf-8")
         except OSError as exc:
-            print(f"diffract: cannot read commit message file: {exc}", file=sys.stderr)
+            print(f"diffract: cannot read the commit message file: {exc}", file=sys.stderr)
             sys.exit(_ERROR_EXIT_CODE)
 
         _lines = raw.splitlines()

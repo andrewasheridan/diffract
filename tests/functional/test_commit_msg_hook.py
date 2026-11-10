@@ -50,7 +50,7 @@ def test_hook_rejects_a_fix_that_removes_a_name(hooked: GitRepo) -> None:
 
 @pytest.mark.parametrize("message", ["feat!: remove beta", "feat(api)!: remove beta", "docs: not checked"])
 def test_hook_accepts_a_matching_or_unchecked_type(hooked: GitRepo, message: str) -> None:
-    """A matching type passes, and a type that diffract does not check is never blocked."""
+    """A correct type passes. diffract never blocks a type that it does not check."""
     hooked.write("src/pkg/__init__.py", REMOVED)
 
     proc = _commit(hooked, message)
@@ -69,7 +69,7 @@ def test_hook_accepts_a_matching_or_unchecked_type(hooked: GitRepo, message: str
     ],
 )
 def test_hook_checks_each_type(hooked: GitRepo, text: str, good: str, bad: str) -> None:
-    """The hook rejects a type that tells less and then accepts the right one for the same staged change."""
+    """The hook refuses a type that tells less, then accepts the correct type for the same staged change."""
     hooked.write("src/pkg/__init__.py", text)
 
     assert _commit(hooked, bad).returncode != 0
@@ -103,7 +103,7 @@ def test_hook_ignores_the_last_commit(hooked: GitRepo) -> None:
 def test_hook_reads_the_temporary_index_of_the_commit(hooked: GitRepo, args: list[str]) -> None:
     """``git commit -a`` and ``git commit <paths>`` give the hook a temporary index, and the hook reads it.
 
-    The change is not staged, so ``.git/index`` still has the old content.
+    The change is not in the staging area. Thus ``.git/index`` still has the old content.
     """
     hooked.write("src/pkg/__init__.py", REMOVED)
     index = hooked.path / ".git" / "index"

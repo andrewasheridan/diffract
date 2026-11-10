@@ -32,7 +32,7 @@ def _clone(tmp_path: Path) -> GitRepo:
 
 @pytest.mark.skipif(not (ROOT / ".git").exists(), reason="needs the diffract git repository, not an sdist")
 def test_diffract_on_itself(tmp_path: Path) -> None:
-    """Removing ``load_config`` from diffract's ``__all__`` is a breaking change, and putting it back is a feature."""
+    """To remove ``load_config`` from ``__all__`` is a breaking change. To add it again is a feature."""
     clone = _clone(tmp_path)
     init = clone.path / INIT
     original = init.read_text(encoding="utf-8")
