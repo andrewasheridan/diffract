@@ -95,7 +95,7 @@ indent-style = "space"
 
 [tool.pyrefly]
 project-includes = ["src", "tests"]
-search-path = ["src"]
+search-path = ["src", "."]
 python-version = "3.14.0"
 preset = "strict"
 check-unannotated-defs = true
