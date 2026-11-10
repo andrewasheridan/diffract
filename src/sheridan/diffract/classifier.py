@@ -48,7 +48,7 @@ def classify(diff: ApiDiff, has_py_changes: bool) -> tuple[CommitType, str]:
        Summary lists removed names grouped by module.
     2. Any added names -> ``feat``.
        Summary lists added names grouped by module.
-    3. No name changes but Python files changed -> ``refactor``.
+    3. No name changes but Python files in the source directory changed -> ``refactor``.
     4. No changes at all -> ``fix``.
 
     Args:
