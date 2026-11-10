@@ -162,9 +162,9 @@ def has_python_changes(repo: Repo, base_ref: str, head_ref: str) -> bool:
 def get_api_at_index(repo: Repo, src_path: str = "src") -> dict[str, list[str]]:
     """Extract the public API surface from the current git staging area (index).
 
-    Materialises the staged tree via ``repo.index.write_tree()``, then uses
-    ``git archive`` on the resulting tree SHA to extract files into a temporary
-    directory before invoking ``sheridan.iceberg.get_public_api()``.
+    Writes the staged tree with ``git write-tree``, then uses ``git archive`` on the
+    resulting tree SHA to extract files into a temporary directory before invoking
+    ``sheridan.iceberg.get_public_api()``.
 
     Args:
         repo: The git repository whose index (staging area) to inspect.
@@ -179,11 +179,12 @@ def get_api_at_index(repo: Repo, src_path: str = "src") -> dict[str, list[str]]:
         SurfaceError: If ``get_public_api`` raises any exception.
 
     Notes:
-        ``write_tree()`` flushes the in-memory index to ``.git/index`` as a
-        side effect before returning the tree object.
+        For ``git commit -a`` and ``git commit <paths>``, git gives the hooks a
+        temporary index in ``GIT_INDEX_FILE``. The ``git`` command obeys this
+        variable, but GitPython's ``IndexFile`` reads ``.git/index``. Thus this
+        function uses the command. It does not write ``.git/index``.
     """
-    tree = repo.index.write_tree()
-    tree_sha: str = tree.hexsha
+    tree_sha: str = repo.git.write_tree()
 
     with tempfile.TemporaryDirectory() as tmp:
         proc = repo.git.archive(tree_sha, format="tar", as_process=True)
@@ -204,7 +205,8 @@ def get_api_at_index(repo: Repo, src_path: str = "src") -> dict[str, list[str]]:
 def has_python_changes_index(repo: Repo) -> bool:
     """Check if any ``.py`` files differ between HEAD and the staging area.
 
-    Compares the current HEAD commit against the git index (staging area).
+    Compares the current HEAD commit against the git index (staging area) with
+    ``git diff --cached``, which obeys ``GIT_INDEX_FILE`` (see ``get_api_at_index``).
     If the repository has no HEAD commit (initial commit edge case), returns
     ``True`` to conservatively assume changes exist.
 
@@ -215,13 +217,9 @@ def has_python_changes_index(repo: Repo) -> bool:
         ``True`` if at least one ``.py`` file appears in the diff between HEAD
         and the index, or if no HEAD commit exists. ``False`` otherwise.
     """
-    try:
-        diffs = repo.index.diff(repo.head.commit)
-    except ValueError:  # repo.head.commit raises ValueError when HEAD is unborn (initial commit)
+    if not repo.head.is_valid():
         return True
-    for d in diffs:
-        a_path: str = d.a_path or ""
-        b_path: str = d.b_path or ""
-        if a_path.endswith(".py") or b_path.endswith(".py"):
-            return True
-    return False
+
+    # Without --no-renames, a renamed file shows only its new path.
+    output: str = repo.git.diff("--cached", "--name-only", "--no-renames", "HEAD")
+    return any(path.endswith(".py") for path in output.splitlines())

@@ -97,3 +97,27 @@ def test_hook_ignores_the_last_commit(hooked: GitRepo) -> None:
     proc = _commit(hooked, "fix: typo")
 
     assert proc.returncode == 0, proc.stderr
+
+
+@pytest.mark.parametrize("args", [["-a"], ["--", "src/pkg/__init__.py"]], ids=["all", "paths"])
+def test_hook_reads_the_temporary_index_of_the_commit(hooked: GitRepo, args: list[str]) -> None:
+    """``git commit -a`` and ``git commit <paths>`` give the hook a temporary index, and the hook reads it.
+
+    The change is not staged, so ``.git/index`` still has the old content.
+    """
+    hooked.write("src/pkg/__init__.py", REMOVED)
+    index = hooked.path / ".git" / "index"
+    staged = index.read_bytes()
+
+    proc = subprocess.run(  # nosec B603 B607
+        ["git", "commit", "-m", "fix: x", *args],
+        cwd=hooked.path,
+        env=hooked.env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert proc.returncode != 0
+    assert "Removed public names:\n  pkg:\n    - beta" in proc.stderr
+    assert index.read_bytes() == staged

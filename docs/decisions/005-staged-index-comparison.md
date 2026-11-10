@@ -11,8 +11,8 @@ The `diffract-validate` pre-commit hook runs at the `commit-msg` stage, which fi
 
 When `--validate-msg-file` is invoked without explicit BASE/HEAD refs (i.e., in the standard commit-msg hook context), diffract now compares `HEAD` (the last committed state) against the **git staging area** (what will become the new commit). This is implemented by:
 
-1. `git_utils.get_api_at_index()` — materialises the staged tree via `repo.index.write_tree()` (which calls `git write-tree` and stores the result as a tree object in the git object store), then archives it with `git archive <tree-sha>` and calls `get_public_api()`
-2. `git_utils.has_python_changes_index()` — uses `repo.head.commit.diff(index=True)` to detect staged `.py` changes
+1. `git_utils.get_api_at_index()` — writes the staged tree with `git write-tree` (through `repo.git`), which stores the tree object in the git object store, then archives it with `git archive <tree-sha>` and calls `get_public_api()`
+2. `git_utils.has_python_changes_index()` — uses `git diff --cached --name-only HEAD` to find staged `.py` changes
 3. `checker.check_staged()` — new public function that orchestrates HEAD vs index comparison
 4. `cli.main()` — routes `--validate-msg-file` (no explicit refs) to `check_staged()` instead of `check()`
 
@@ -30,9 +30,9 @@ The `DiffractResult` returned by `check_staged()` uses the sentinel string `":st
 
 **Positive:**
 - The hook now correctly detects what is actually being committed
-- `write_tree()` is read-safe: it writes a loose tree object to the git object store (no ref changes, no working-tree changes)
+- `git write-tree` is read-safe: it writes a loose tree object to the git object store (no ref changes, no working-tree changes, no change to `.git/index`)
+- The `git` command obeys `GIT_INDEX_FILE`, so the hook reads the temporary index of `git commit -a` (see the correction in ADR 003)
 - `check_staged()` is also useful as a public Python API for programmatic pre-commit tooling
 
 **Negative:**
-- `write_tree()` has a subtle side effect: it flushes the in-memory index to `.git/index`. This is benign in normal commit-msg hook usage but could be surprising during a rebase or merge in progress
 - The `:staged` sentinel in `DiffractResult.head_ref` is not a real git ref; downstream tools that try to pass it back to git will fail — this is documented in the code
