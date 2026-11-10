@@ -9,70 +9,70 @@ from sheridan.diffract.models import ApiDiff, DiffractResult, NameChange
 
 
 class TestNameChange:
-    """Tests for the NameChange frozen dataclass."""
+    """Tests for the NameChange dataclass."""
 
     def test_fields_stored_correctly(self) -> None:
-        """NameChange must store module, name, and kind."""
+        """NameChange must keep module, name and kind."""
         nc = NameChange(module="pkg.mod", name="Foo", kind=ChangeKind.added)
         assert nc.module == "pkg.mod"
         assert nc.name == "Foo"
         assert nc.kind == ChangeKind.added
 
     def test_is_frozen(self) -> None:
-        """NameChange must be immutable."""
+        """You must not be able to change a NameChange."""
         nc = NameChange(module="pkg.mod", name="Foo", kind=ChangeKind.added)
         with pytest.raises(AttributeError):
             nc.name = "Bar"  # type: ignore[misc]
 
     def test_equality(self) -> None:
-        """Two NameChanges with identical fields must be equal."""
+        """Two NameChanges with the same fields must be equal."""
         a = NameChange(module="m", name="X", kind=ChangeKind.added)
         b = NameChange(module="m", name="X", kind=ChangeKind.added)
         assert a == b
 
     def test_hashable(self) -> None:
-        """NameChange must be usable as a dict key / set member."""
+        """You must be able to use a NameChange as a dict key or in a set."""
         nc = NameChange(module="m", name="X", kind=ChangeKind.added)
         assert {nc}
 
 
 class TestApiDiff:
-    """Tests for ApiDiff dataclass and its computed properties."""
+    """Tests for the ApiDiff dataclass and its properties."""
 
     def test_is_empty_when_no_changes(self, empty_diff: ApiDiff) -> None:
-        """is_empty must be True when there are no added or removed names."""
+        """is_empty must be True if no names were added or removed."""
         assert empty_diff.is_empty
 
     def test_is_not_empty_with_additions(self, addition_diff: ApiDiff) -> None:
-        """is_empty must be False when names were added."""
+        """is_empty must be False if names were added."""
         assert not addition_diff.is_empty
 
     def test_is_not_empty_with_removals(self, removal_diff: ApiDiff) -> None:
-        """is_empty must be False when names were removed."""
+        """is_empty must be False if names were removed."""
         assert not removal_diff.is_empty
 
     def test_is_breaking_false_for_additions_only(self, addition_diff: ApiDiff) -> None:
-        """is_breaking must be False when no names were removed."""
+        """is_breaking must be False if no names were removed."""
         assert not addition_diff.is_breaking
 
     def test_is_breaking_true_when_names_removed(self, removal_diff: ApiDiff) -> None:
-        """is_breaking must be True when names were removed."""
+        """is_breaking must be True if names were removed."""
         assert removal_diff.is_breaking
 
     def test_is_breaking_true_for_mixed_diff(self, mixed_diff: ApiDiff) -> None:
-        """is_breaking must be True even when names were also added."""
+        """is_breaking must be True also if names were added."""
         assert mixed_diff.is_breaking
 
     def test_has_additions_true(self, addition_diff: ApiDiff) -> None:
-        """has_additions must be True when names were added."""
+        """has_additions must be True if names were added."""
         assert addition_diff.has_additions
 
     def test_has_additions_false_for_empty(self, empty_diff: ApiDiff) -> None:
-        """has_additions must be False when nothing was added."""
+        """has_additions must be False if no names were added."""
         assert not empty_diff.has_additions
 
     def test_is_frozen(self) -> None:
-        """ApiDiff must be immutable."""
+        """You must not be able to change an ApiDiff."""
         diff = ApiDiff(added=(), removed=())
         with pytest.raises(AttributeError):
             diff.added = ()  # type: ignore[misc]
@@ -91,12 +91,12 @@ class TestDiffractResult:
         )
 
     def test_to_dict_has_expected_keys(self, addition_diff: ApiDiff) -> None:
-        """to_dict must include all five top-level keys."""
+        """to_dict must have the five top-level keys."""
         d = self._make_result(addition_diff).to_dict()
         assert set(d.keys()) == {"commit_type", "summary", "base_ref", "head_ref", "diff"}
 
     def test_to_dict_commit_type_is_plain_string(self, empty_diff: ApiDiff) -> None:
-        """commit_type in to_dict must be the plain string value, not an enum repr."""
+        """commit_type in to_dict must be the string value, not the repr of the enum."""
         result = self._make_result(empty_diff, CommitType.feat_breaking)
         assert result.to_dict()["commit_type"] == "feat!"
 
@@ -116,7 +116,7 @@ class TestDiffractResult:
         assert removed[0] == {"module": "mypackage.mod", "name": "OldClass"}
 
     def test_to_dict_is_json_serialisable(self, mixed_diff: ApiDiff) -> None:
-        """to_dict output must round-trip through json.dumps/loads without error."""
+        """json.dumps and json.loads must convert the to_dict output without an error."""
         result = DiffractResult(
             commit_type=CommitType.feat_breaking,
             summary="Breaking change",
@@ -129,7 +129,7 @@ class TestDiffractResult:
         assert parsed["base_ref"] == "v1.0"
 
     def test_is_frozen(self, empty_diff: ApiDiff) -> None:
-        """DiffractResult must be immutable."""
+        """You must not be able to change a DiffractResult."""
         result = self._make_result(empty_diff)
         with pytest.raises(AttributeError):
             result.summary = "changed"  # type: ignore[misc]

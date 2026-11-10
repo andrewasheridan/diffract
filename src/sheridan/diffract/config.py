@@ -1,4 +1,4 @@
-"""TOML config file support for sheridan-diffract."""
+"""Read the sheridan-diffract configuration from TOML files."""
 
 __all__ = ["DiffractConfig", "load_config"]
 
@@ -12,38 +12,38 @@ from sheridan.diffract.exceptions import DiffractError
 
 @dataclass(frozen=True)
 class DiffractConfig:
-    """Configuration loaded from diffract.toml or pyproject.toml.
+    """The configuration from ``diffract.toml`` or ``pyproject.toml``.
 
-    Fields are None if not specified in any config file — the caller
-    merges them with CLI flags and built-in defaults.
+    A field is ``None`` if no configuration file sets it. The caller then uses the CLI
+    flag or the default value.
 
     Attributes:
-        src: The source directory within the repository to scan, or None
-            if not specified in any config file.
+        src: The source directory in the repository, or ``None`` if no configuration
+            file sets it.
     """
 
     src: str | None = None
 
 
 def _parse_src(data: dict[str, Any], config_file: Path) -> str | None:
-    """Extract and validate the ``src`` key from a TOML data dict.
+    """Get the ``src`` value from a TOML table and make sure that it is a string.
 
     Args:
-        data: The parsed TOML table to read from.
-        config_file: Path to the config file, used in error messages.
+        data: The parsed TOML table.
+        config_file: The path of the configuration file, for the error message.
 
     Returns:
-        The value of ``src`` as a string, or ``None`` if not present.
+        The value of ``src``, or ``None`` if the table has no ``src`` key.
 
     Raises:
-        DiffractError: If ``src`` is present but is not a string.
+        DiffractError: If ``src`` is not a string.
     """
     src = data.get("src")
     if src is None:
         return None
     if not isinstance(src, str):
         raise DiffractError(
-            f"Invalid diffract config in {config_file}: 'src' must be a string, got {type(src).__name__!r}"
+            f"Incorrect diffract configuration in {config_file}: 'src' must be a string, not {type(src).__name__!r}"
         )
     return src
 
@@ -52,27 +52,28 @@ def _get_table(data: dict[str, Any], key: str, config_file: Path, prefix: str = 
     """Get a TOML table from a parsed TOML table.
 
     Args:
-        data: The parsed TOML table to read from.
+        data: The parsed TOML table.
         key: The key of the table to get.
-        config_file: Path to the config file, used in error messages.
-        prefix: The dotted path to ``data`` in the file, used in error messages.
+        config_file: The path of the configuration file, for the error message.
+        prefix: The dotted path of ``data`` in the file, for the error message.
 
     Returns:
         The table at ``key``, or an empty dict if ``key`` is not present.
 
     Raises:
-        DiffractError: If ``key`` is present but is not a table.
+        DiffractError: If the value of ``key`` is not a table.
     """
     table = data.get(key, {})
     if not isinstance(table, dict):
         raise DiffractError(
-            f"Invalid diffract config in {config_file}: '{prefix}{key}' must be a table, got {type(table).__name__!r}"
+            f"Incorrect diffract configuration in {config_file}: "
+            f"'{prefix}{key}' must be a table, not {type(table).__name__!r}"
         )
     return table
 
 
 def _load_toml(path: Path) -> dict[str, Any]:
-    """Read and parse a TOML file, converting parse errors to DiffractError.
+    """Read and parse a TOML file. Change a parse error to a ``DiffractError``.
 
     Args:
         path: The TOML file to read.
@@ -81,32 +82,31 @@ def _load_toml(path: Path) -> dict[str, Any]:
         The parsed TOML document as a dict.
 
     Raises:
-        DiffractError: If the file contains invalid TOML.
+        DiffractError: If the file is not correct TOML.
     """
     try:
         with path.open("rb") as f:
             return tomllib.load(f)
     except tomllib.TOMLDecodeError as exc:
-        raise DiffractError(f"Failed to parse {path}: {exc}") from exc
+        raise DiffractError(f"Cannot parse {path}: {exc}") from exc
 
 
 def load_config(repo_root: Path) -> DiffractConfig:
-    """Load diffract configuration from the repo root.
+    """Read the diffract configuration from the root of the repository.
 
-    Checks for ``diffract.toml`` first, then ``pyproject.toml [tool.diffract]``.
-    Returns a ``DiffractConfig`` with ``None`` for any field not found.
+    The function reads ``diffract.toml`` first. If that file does not exist, it reads
+    ``[tool.diffract]`` in ``pyproject.toml``. A field that no file sets is ``None``.
 
     Args:
         repo_root: The root directory of the git repository.
 
     Returns:
-        A ``DiffractConfig`` populated from the first config file found,
-        or an empty ``DiffractConfig`` if neither file exists.
+        A ``DiffractConfig`` from the first configuration file that exists, or an
+        empty ``DiffractConfig`` if the two files do not exist.
 
     Raises:
-        DiffractError: If a config file is found but contains invalid TOML,
-            a ``tool`` or ``tool.diffract`` value that is not a table, or an
-            ``src`` value that is not a string.
+        DiffractError: If the configuration file is not correct TOML, if ``tool`` or
+            ``tool.diffract`` is not a table, or if ``src`` is not a string.
     """
     diffract_toml = repo_root / "diffract.toml"
     if diffract_toml.is_file():

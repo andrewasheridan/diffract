@@ -1,6 +1,6 @@
 """Run the examples in README.md against a temporary repository with the real CLI and iceberg.
 
-Each expected output is also checked against the README text, so the README and the tool stay in step.
+The tests also compare each expected output with the README text. Thus the README and the tool stay the same.
 """
 
 import json
@@ -31,7 +31,7 @@ Suggested commit prefix: feat!:
 FIX_OUTPUT = """\
 Detected: fix
 
-No public API changes detected.
+The public API did not change.
 
 Suggested commit prefix: fix:
 """

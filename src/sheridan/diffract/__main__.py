@@ -1,4 +1,4 @@
-"""Entry point for ``python -m sheridan.diffract``."""
+"""Run the ``diffract`` command for ``python -m sheridan.diffract``."""
 
 from sheridan.diffract.cli import main
 

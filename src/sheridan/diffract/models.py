@@ -1,4 +1,4 @@
-"""Data models for sheridan-diffract."""
+"""The data classes of sheridan-diffract."""
 
 __all__ = ["ApiDiff", "DiffractResult", "NameChange"]
 
@@ -9,12 +9,12 @@ from sheridan.diffract.enums import ChangeKind, CommitType
 
 @dataclass(frozen=True)
 class NameChange:
-    """A single public name that was added or removed from a module.
+    """One public name that was added to a module or removed from a module.
 
     Attributes:
-        module: Qualified module name, e.g. ``"sheridan.diffract.enums"``.
-        name: The public identifier, e.g. ``"CommitType"``.
-        kind: Whether the name was added or removed.
+        module: The full module name, for example ``"sheridan.diffract.enums"``.
+        name: The public name, for example ``"CommitType"``.
+        kind: Tells if the name was added or removed.
     """
 
     module: str
@@ -24,11 +24,11 @@ class NameChange:
 
 @dataclass(frozen=True)
 class ApiDiff:
-    """The complete difference between two API surfaces.
+    """All the differences between two public APIs.
 
     Attributes:
-        added: Public names present in head but not in base.
-        removed: Public names present in base but not in head.
+        added: The public names that are in head but not in base.
+        removed: The public names that are in base but not in head.
     """
 
     added: tuple[NameChange, ...]
@@ -36,12 +36,12 @@ class ApiDiff:
 
     @property
     def is_breaking(self) -> bool:
-        """True if any public names were removed."""
+        """True if one or more public names were removed."""
         return bool(self.removed)
 
     @property
     def has_additions(self) -> bool:
-        """True if any public names were added."""
+        """True if one or more public names were added."""
         return bool(self.added)
 
     @property
@@ -52,14 +52,14 @@ class ApiDiff:
 
 @dataclass(frozen=True)
 class DiffractResult:
-    """The complete output of a diffract check.
+    """All the output of a diffract check.
 
     Attributes:
-        commit_type: The conventional-commit type inferred from the diff.
-        summary: A human-readable description of the changes.
+        commit_type: The Conventional Commit type that diffract gives for the diff.
+        summary: A short description of the changes.
         diff: The full API diff between base and head.
-        base_ref: The earlier git ref that was compared.
-        head_ref: The later git ref that was compared.
+        base_ref: The earlier git ref of the comparison.
+        head_ref: The later git ref of the comparison.
     """
 
     commit_type: CommitType
@@ -69,12 +69,12 @@ class DiffractResult:
     head_ref: str
 
     def to_dict(self) -> dict[str, object]:
-        """Convert this result to a JSON-serialisable dict.
+        """Convert this result to a dict that ``json.dumps`` can write.
 
         Returns:
-            A dict with keys ``commit_type``, ``summary``, ``base_ref``,
-            ``head_ref``, and ``diff`` (which contains ``added`` and
-            ``removed`` lists of ``{"module": ..., "name": ...}`` dicts).
+            A dict with the keys ``commit_type``, ``summary``, ``base_ref``,
+            ``head_ref`` and ``diff``. ``diff`` has the keys ``added`` and
+            ``removed``. Each is a list of ``{"module": ..., "name": ...}`` dicts.
         """
         return {
             "commit_type": str(self.commit_type),

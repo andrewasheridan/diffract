@@ -40,15 +40,15 @@ class TestGetRepo:
     """Tests for get_repo()."""
 
     def test_raises_git_error_when_no_repo(self, tmp_path: Path, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
-        """get_repo must raise GitError when no git repository exists at path."""
+        """get_repo must raise GitError if no git repository exists at path."""
         from git import InvalidGitRepositoryError
 
         mocker.patch("sheridan.diffract.git_utils.Repo", side_effect=InvalidGitRepositoryError)
-        with pytest.raises(GitError, match="No git repository found"):
+        with pytest.raises(GitError, match="Cannot find a git repository"):
             get_repo(tmp_path)
 
     def test_returns_repo_on_success(self, tmp_path: Path, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
-        """get_repo must return the Repo instance when a repository is found."""
+        """get_repo must give the Repo if a repository exists."""
         mock_repo = MagicMock()
         mocker.patch("sheridan.diffract.git_utils.Repo", return_value=mock_repo)
         assert get_repo(tmp_path) is mock_repo
@@ -69,22 +69,22 @@ class TestHasPythonChanges:
         return repo
 
     def test_returns_true_when_py_file_changed(self) -> None:
-        """Must return True when a .py file under src appears in the diff."""
+        """Must give True if a .py file in src is in the diff."""
         repo = self._repo_with_diff([self._diff_item("src/pkg/module.py", "src/pkg/module.py")])
         assert has_python_changes(repo, "HEAD~1", "HEAD") is True
 
     def test_returns_false_when_only_non_py_files_changed(self) -> None:
-        """Must return False when only non-.py files appear in the diff."""
+        """Must give False if the diff has no .py files."""
         repo = self._repo_with_diff([self._diff_item("src/pkg/data.json", "src/pkg/data.json")])
         assert has_python_changes(repo, "HEAD~1", "HEAD") is False
 
     def test_returns_false_when_diff_is_empty(self) -> None:
-        """Must return False when there are no diffed files at all."""
+        """Must give False if the diff is empty."""
         repo = self._repo_with_diff([])
         assert has_python_changes(repo, "HEAD~1", "HEAD") is False
 
     def test_detects_py_change_via_b_path(self) -> None:
-        """Must return True when b_path is a .py file (e.g. newly created file)."""
+        """Must give True if b_path is a .py file, for example a new file."""
         repo = self._repo_with_diff([self._diff_item("", "src/pkg/new_module.py")])
         assert has_python_changes(repo, "HEAD~1", "HEAD") is True
 
@@ -146,7 +146,7 @@ class TestGetApiAtRef:
         mock_tmpdir: MagicMock,
         mock_tar_open: MagicMock,
     ) -> None:
-        """Wire up the git archive + tarfile mocks shared across tests, with an empty ``src`` directory."""
+        """Set the git archive and tarfile mocks for the tests, with an empty ``src`` directory."""
         (tmp_path / "src").mkdir(exist_ok=True)
         mock_proc = MagicMock()
         mock_proc.stdout = MagicMock()
@@ -157,12 +157,12 @@ class TestGetApiAtRef:
         mock_tar_open.return_value.__exit__.return_value = False
 
     def test_raises_git_error_for_bad_ref(self, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
-        """Must raise GitError when the ref is not valid in the repository."""
+        """Must raise GitError if the ref does not exist in the repository."""
         from git import BadName
 
         repo = MagicMock()
         repo.commit.side_effect = BadName("bad-ref")
-        with pytest.raises(GitError, match="Unknown ref: bad-ref"):
+        with pytest.raises(GitError, match="The ref does not exist: bad-ref"):
             get_api_at_ref(repo, "bad-ref")
 
     def test_raises_surface_error_when_iceberg_fails(
@@ -170,7 +170,7 @@ class TestGetApiAtRef:
         tmp_path: Path,
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """Must raise SurfaceError when get_public_api raises."""
+        """Must raise SurfaceError if get_public_api raises an exception."""
         repo = MagicMock()
         repo.commit.return_value = MagicMock()
         mock_tar_open = mocker.patch("sheridan.diffract.git_utils.tarfile.open")
@@ -178,7 +178,7 @@ class TestGetApiAtRef:
         mocker.patch("sheridan.diffract.git_utils.get_public_api", side_effect=RuntimeError("boom"))
         self._setup_archive_mocks(repo, tmp_path, mock_tmpdir, mock_tar_open)
 
-        with pytest.raises(SurfaceError, match="Failed to extract"):
+        with pytest.raises(SurfaceError, match="Cannot extract the public API"):
             get_api_at_ref(repo, "HEAD")
 
     def test_returns_api_mapping_on_success(
@@ -186,7 +186,7 @@ class TestGetApiAtRef:
         tmp_path: Path,
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """Must convert the iceberg tree to a map of module names to sorted public names."""
+        """Must convert the iceberg tree to a dict from module names to sorted public names."""
         repo = MagicMock()
         repo.commit.return_value = MagicMock()
         mock_tar_open = mocker.patch("sheridan.diffract.git_utils.tarfile.open")
@@ -201,7 +201,7 @@ class TestGetApiAtRef:
         tmp_path: Path,
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """Must return None, and not read the root, when the src_path subdirectory does not exist."""
+        """Must give None, and not read the root, if the src_path directory does not exist."""
         repo = MagicMock()
         repo.commit.return_value = MagicMock()
         mock_tar_open = mocker.patch("sheridan.diffract.git_utils.tarfile.open")
@@ -217,7 +217,7 @@ class TestGetApiAtRef:
         tmp_path: Path,
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """Must read the temp root when src_path is ``"."``."""
+        """Must read the temporary root if src_path is ``"."``."""
         repo = MagicMock()
         repo.commit.return_value = MagicMock()
         captured: list[Path] = []
@@ -272,7 +272,7 @@ class TestGetApiAtRef:
         tmp_path: Path,
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """Must return None without ``git archive``, which fails for a pathspec that has no match."""
+        """Must give None before it runs ``git archive``, which fails for a pathspec that has no match."""
         repo = MagicMock()
         mock_tar_open = mocker.patch("sheridan.diffract.git_utils.tarfile.open")
         mock_tmpdir = mocker.patch("sheridan.diffract.git_utils.tempfile.TemporaryDirectory")
@@ -287,7 +287,7 @@ class TestGetApiAtRef:
         tmp_path: Path,
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """Must raise GitError when ``git archive`` exits with an error."""
+        """Must raise GitError if ``git archive`` exits with an error."""
         from git import GitCommandError
 
         repo = MagicMock()
@@ -304,7 +304,7 @@ class TestGetApiAtRef:
         tmp_path: Path,
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """Must raise GitError when the ``data`` filter refuses a file."""
+        """Must raise GitError if the ``data`` filter refuses a file."""
         import tarfile
 
         repo = MagicMock()
@@ -380,14 +380,14 @@ class TestGetApiAtIndex:
         mocker.patch("sheridan.diffract.git_utils.get_public_api", side_effect=RuntimeError("boom"))
         self._setup_index_mocks(repo, tmp_path, mock_tmpdir, mock_tar_open)
 
-        with pytest.raises(SurfaceError, match="Failed to extract public API from index"):
+        with pytest.raises(SurfaceError, match="Cannot extract the public API from the staging area"):
             get_api_at_index(repo)
 
     def test_propagates_exception_when_write_tree_fails(
         self,
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        # write_tree() failures are not wrapped — they propagate to the caller.
+        # The function does not change a write_tree() error. The caller gets the error.
         repo = MagicMock()
         repo.git.write_tree.side_effect = Exception("index error")
 
@@ -399,7 +399,7 @@ class TestGetApiAtIndex:
         tmp_path: Path,
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """Must return None, and not read the root, when the src_path subdirectory does not exist."""
+        """Must give None, and not read the root, if the src_path directory does not exist."""
         repo = MagicMock()
         mock_tar_open = mocker.patch("sheridan.diffract.git_utils.tarfile.open")
         mock_tmpdir = mocker.patch("sheridan.diffract.git_utils.tempfile.TemporaryDirectory")
@@ -541,13 +541,13 @@ class TestReadApi:
         assert self._api(tmp_path, "lib", mocker) == {"top": ["top"], "pkg": ["A"], "pkg.sub.mod": ["B"]}
 
     def test_keeps_the_name_of_a_package_root(self, tmp_path: Path, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
-        """Must keep the package name when ``src_path`` is itself a package."""
+        """Must keep the package name if ``src_path`` is a package."""
         self._write(tmp_path, {"src/pkg/__init__.py": "A = 1\n", "src/pkg/mod.py": "B = 2\n"})
 
         assert self._api(tmp_path, "src/pkg", mocker) == {"pkg": ["A"], "pkg.mod": ["B"]}
 
     def test_skips_private_modules(self, tmp_path: Path, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
-        """Must not report the names in a private module."""
+        """Must not give the names in a private module."""
         self._write(tmp_path, {"src/pkg/__init__.py": "A = 1\n", "src/pkg/_impl.py": "B = 2\n"})
 
         assert self._api(tmp_path, "src", mocker) == {"pkg": ["A"]}

@@ -20,10 +20,10 @@ INITIAL_PACKAGE = (
 
 
 def clean_env(home: Path) -> dict[str, str]:
-    """Build an environment that isolates git from the user's config and from git hooks.
+    """Make an environment that isolates git from the user's configuration and git hooks.
 
-    The ``GIT_*`` variables are removed, so a test run started from a git hook (for example
-    the pre-push pytest hook) does not act on this repository.
+    The function removes the ``GIT_*`` variables. Thus a test run that a git hook starts
+    (for example the pre-push pytest hook) does not change this repository.
 
     Args:
         home: A directory to use as ``HOME``.
@@ -81,7 +81,7 @@ class GitRepo:
         target.write_text(text, encoding="utf-8")
 
     def commit(self, message: str) -> None:
-        """Stage all changes and commit them, without running hooks.
+        """Stage all the changes and commit them. Do not run the hooks.
 
         Args:
             message: The commit message.
@@ -96,7 +96,7 @@ class GitRepo:
             *args: The CLI arguments.
 
         Returns:
-            The completed process. Its return code is not checked.
+            The completed process. The function does not check its return code.
         """
         return subprocess.run(  # nosec B603
             [str(DIFFRACT), *args], cwd=self.path, env=self.env, capture_output=True, text=True, check=False

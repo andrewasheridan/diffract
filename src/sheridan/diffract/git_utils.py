@@ -1,4 +1,4 @@
-"""Git interaction utilities for sheridan-diffract."""
+"""Get the files and the public API of sheridan-diffract from git."""
 
 __all__ = [
     "get_api_at_index",
@@ -86,8 +86,8 @@ def _is_python_in(path: str, src_path: str) -> bool:
         src_path: The source directory relative to the repository root. ``"."`` is the root.
 
     Returns:
-        ``True`` if ``path`` ends with ``.py`` or ``.pyi`` and is in ``src_path``, ``False``
-        otherwise.
+        ``True`` if ``path`` ends with ``.py`` or ``.pyi`` and is in ``src_path``.
+        ``False`` if not.
     """
     if not path.endswith(_PYTHON_SUFFIXES):
         return False
@@ -120,7 +120,7 @@ def _extract_src(repo: Repo, treeish: str, src_path: str, dest: Path) -> Path | 
     pathspec: list[str] = []
     if src.parts:
         pathspec = ["--", str(src)]
-        # git archive fails for a pathspec that has no match, thus find the directory first.
+        # git archive fails for a pathspec that has no match. Thus find the directory first.
         if not repo.git.ls_tree(treeish, *pathspec):
             return None
 
@@ -140,50 +140,49 @@ def _extract_src(repo: Repo, treeish: str, src_path: str, dest: Path) -> Path | 
 
 
 def get_repo(path: Path) -> Repo:
-    """Find and return the git Repo at or above path.
+    """Find the git repository at ``path`` or in a parent directory of ``path``.
 
     Args:
-        path: A path inside (or equal to) the git repository root.
+        path: The root of the git repository, or a path in it.
 
     Returns:
-        The ``git.Repo`` instance for the repository.
+        The ``git.Repo`` of the repository.
 
     Raises:
-        GitError: If no git repository is found at or above ``path``.
+        GitError: If there is no git repository at or above ``path``.
     """
     try:
         return Repo(str(path), search_parent_directories=True)
     except InvalidGitRepositoryError as exc:
-        raise GitError(f"No git repository found at or above: {path}") from exc
+        raise GitError(f"Cannot find a git repository at or above {path}") from exc
 
 
 def get_api_at_ref(repo: Repo, ref: str, src_path: str = "src") -> dict[str, list[str]] | None:
-    """Extract the public API surface at a given git ref.
+    """Extract the public API at a git ref.
 
-    Uses ``git archive`` to extract only ``src_path`` into a temporary
-    directory, then invokes ``sheridan.iceberg.get_public_api()`` on it.
+    The function uses ``git archive`` to write only ``src_path`` to a temporary
+    directory. Then it calls ``sheridan.iceberg.get_public_api()`` on that directory.
     To read the repository root, use ``"."``.
 
     Args:
         repo: The git repository to archive.
-        ref: The git ref (branch, tag, or commit SHA) to check out.
-        src_path: Relative path within the repo that contains Python packages.
+        ref: The git ref (a branch, a tag or a commit SHA) to read.
+        src_path: The directory in the repository that contains the Python packages.
 
     Returns:
-        A mapping of fully-qualified module name to list of public names,
-        sorted. The module names are relative to ``src_path``. ``None`` if
-        ``src_path`` does not exist at ``ref``.
+        A dict from each full module name to its sorted public names. The module names
+        are relative to ``src_path``. ``None`` if ``src_path`` does not exist at ``ref``.
 
     Raises:
-        GitError: If ``ref`` is not a valid ref in the repository, or if
-            ``git archive`` or the tar extraction fails.
-        SurfaceError: If ``get_public_api`` raises any exception.
+        GitError: If ``ref`` is not a ref in the repository, or if ``git archive`` or
+            the tar extraction fails.
+        SurfaceError: If ``get_public_api`` raises an exception.
     """
-    # Validate the ref early so we can give a clear error message.
+    # Check the ref first to give a clear error message.
     try:
         repo.commit(ref)
     except BadName as exc:
-        raise GitError(f"Unknown ref: {ref}") from exc
+        raise GitError(f"The ref does not exist: {ref}") from exc
 
     with tempfile.TemporaryDirectory() as tmp:
         api_root = _extract_src(repo, ref, src_path, Path(tmp))
@@ -193,25 +192,25 @@ def get_api_at_ref(repo: Repo, ref: str, src_path: str = "src") -> dict[str, lis
         try:
             return _read_api(api_root)
         except Exception as exc:
-            raise SurfaceError(f"Failed to extract public API at ref {ref!r}: {exc}") from exc
+            raise SurfaceError(f"Cannot extract the public API at ref {ref!r}: {exc}") from exc
 
 
 def has_python_changes(repo: Repo, base_ref: str, head_ref: str, src_path: str = "src") -> bool:
-    """Check if any ``.py`` or ``.pyi`` files under ``src_path`` differ between base_ref and head_ref.
+    """Find if a ``.py`` or ``.pyi`` file in ``src_path`` changed between the two refs.
 
-    A ``.py`` or ``.pyi`` file outside ``src_path`` (for example in ``tests/``) is not package code,
-    thus it does not count. A renamed file counts if its old path or its new path is in
-    ``src_path``.
+    A ``.py`` or ``.pyi`` file outside ``src_path`` (for example in ``tests/``) is not
+    package code. Thus it does not count. A renamed file counts if its old path or its
+    new path is in ``src_path``.
 
     Args:
-        repo: The git repository to inspect.
+        repo: The git repository.
         base_ref: The earlier git ref.
         head_ref: The later git ref.
-        src_path: Relative path within the repo that contains Python packages.
+        src_path: The directory in the repository that contains the Python packages.
 
     Returns:
-        ``True`` if at least one ``.py`` or ``.pyi`` file under ``src_path`` appears in
-        the diff, ``False`` otherwise.
+        ``True`` if one or more ``.py`` or ``.pyi`` files in ``src_path`` are in the
+        diff. ``False`` if not.
     """
     base_commit = repo.commit(base_ref)
     head_commit = repo.commit(head_ref)
@@ -226,24 +225,24 @@ def has_python_changes(repo: Repo, base_ref: str, head_ref: str, src_path: str =
 
 
 def get_api_at_index(repo: Repo, src_path: str = "src") -> dict[str, list[str]] | None:
-    """Extract the public API surface from the current git staging area (index).
+    """Extract the public API from the git staging area (the index).
 
-    Writes the staged tree with ``git write-tree``, then uses ``git archive`` on the
-    resulting tree SHA to extract only ``src_path`` into a temporary directory before invoking
-    ``sheridan.iceberg.get_public_api()``.
+    The function writes the staged tree with ``git write-tree``. Then it uses
+    ``git archive`` on that tree to write only ``src_path`` to a temporary directory.
+    Then it calls ``sheridan.iceberg.get_public_api()`` on that directory.
 
     Args:
-        repo: The git repository whose index (staging area) to inspect.
-        src_path: Relative path within the repo that contains Python packages.
+        repo: The git repository. The function reads its staging area.
+        src_path: The directory in the repository that contains the Python packages.
 
     Returns:
-        A mapping of fully-qualified module name to list of public names,
-        sorted. The module names are relative to ``src_path``. ``None`` if
-        ``src_path`` does not exist in the staging area.
+        A dict from each full module name to its sorted public names. The module names
+        are relative to ``src_path``. ``None`` if ``src_path`` does not exist in the
+        staging area.
 
     Raises:
         GitError: If ``git archive`` or the tar extraction fails.
-        SurfaceError: If ``get_public_api`` raises any exception.
+        SurfaceError: If ``get_public_api`` raises an exception.
 
     Notes:
         For ``git commit -a`` and ``git commit <paths>``, git gives the hooks a
@@ -261,25 +260,25 @@ def get_api_at_index(repo: Repo, src_path: str = "src") -> dict[str, list[str]] 
         try:
             return _read_api(api_root)
         except Exception as exc:
-            raise SurfaceError(f"Failed to extract public API from index: {exc}") from exc
+            raise SurfaceError(f"Cannot extract the public API from the staging area: {exc}") from exc
 
 
 def has_python_changes_index(repo: Repo, src_path: str = "src") -> bool:
-    """Check if any ``.py`` or ``.pyi`` files under ``src_path`` differ between HEAD and the index.
+    """Find if a ``.py`` or ``.pyi`` file in ``src_path`` changed between HEAD and the index.
 
-    Compares the current HEAD commit against the git index (staging area) with
+    The function compares the HEAD commit with the staging area (the index). It uses
     ``git diff --cached``, which obeys ``GIT_INDEX_FILE`` (see ``get_api_at_index``).
-    A ``.py`` or ``.pyi`` file outside ``src_path`` does not count. If the repository has no HEAD
-    commit (initial commit edge case), returns ``True`` to conservatively assume changes
-    exist.
+    A ``.py`` or ``.pyi`` file outside ``src_path`` does not count. Before the first
+    commit, the repository has no HEAD commit. Then the function gives ``True``, because
+    all the files are new.
 
     Args:
-        repo: The git repository to inspect.
-        src_path: Relative path within the repo that contains Python packages.
+        repo: The git repository.
+        src_path: The directory in the repository that contains the Python packages.
 
     Returns:
-        ``True`` if at least one ``.py`` or ``.pyi`` file under ``src_path`` appears in
-        the diff between HEAD and the index, or if no HEAD commit exists. ``False`` otherwise.
+        ``True`` if one or more ``.py`` or ``.pyi`` files in ``src_path`` are in the
+        diff between HEAD and the index, or if there is no HEAD commit. ``False`` if not.
     """
     if not repo.head.is_valid():
         return True

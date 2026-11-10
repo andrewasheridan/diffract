@@ -4,7 +4,7 @@ from sheridan.diffract.enums import ChangeKind, CommitType
 
 
 class TestCommitType:
-    """Tests for CommitType StrEnum."""
+    """Tests for the CommitType StrEnum."""
 
     def test_values(self) -> None:
         """CommitType members must have the correct string values."""
@@ -14,7 +14,7 @@ class TestCommitType:
         assert CommitType.refactor == "refactor"
 
     def test_is_str(self) -> None:
-        """CommitType members must be usable as plain strings."""
+        """You must be able to use CommitType members as strings."""
         assert str(CommitType.feat_breaking) == "feat!"
 
     def test_all_members_present(self) -> None:
@@ -28,7 +28,7 @@ class TestCommitType:
 
 
 class TestChangeKind:
-    """Tests for ChangeKind StrEnum."""
+    """Tests for the ChangeKind StrEnum."""
 
     def test_values(self) -> None:
         """ChangeKind members must have the correct string values."""

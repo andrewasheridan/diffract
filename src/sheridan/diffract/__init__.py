@@ -1,4 +1,4 @@
-"""sheridan-diffract: Detect public API changes between git refs and classify commits."""
+"""sheridan-diffract: find the public API changes between two git refs and give the commit type."""
 
 __all__ = [
     "ApiDiff",

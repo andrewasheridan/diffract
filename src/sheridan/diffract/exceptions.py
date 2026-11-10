@@ -1,15 +1,15 @@
-"""Exceptions for sheridan-diffract."""
+"""The exceptions of sheridan-diffract."""
 
 __all__ = ["DiffractError", "GitError", "SurfaceError"]
 
 
 class DiffractError(Exception):
-    """Base exception for all sheridan-diffract errors."""
+    """The base class of all sheridan-diffract errors."""
 
 
 class GitError(DiffractError):
-    """Raised when a git operation fails (repo not found, bad ref, etc.)."""
+    """A git command failed. For example, the repository or the ref does not exist."""
 
 
 class SurfaceError(DiffractError):
-    """Raised when iceberg fails to extract a public API surface."""
+    """iceberg cannot extract the public API."""
