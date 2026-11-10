@@ -12,7 +12,7 @@ task lint           # ruff check --fix
 task lint:check     # ruff check (read-only, used in CI)
 task format         # ruff format
 task format:check   # ruff format --check (read-only, used in CI)
-task typecheck      # mypy --strict src/
+task typecheck      # pyrefly check (strict preset, src/ and tests/)
 task test           # pytest --cov (coverage ≥ 90% required)
 task install        # uv sync (dev + test dependency groups)
 task lock:check     # uv lock --check (uv.lock is up to date)
@@ -78,7 +78,7 @@ from sheridan.iceberg import get_public_api
 ## Dependencies
 
 - **Runtime**: `sheridan-iceberg`, `gitpython`
-- **Dev**: `ruff`, `mypy`, `pytest`, `pytest-cov`, `pytest-mock`, `commitizen`, `pre-commit`, `bandit`, `zensical`, `mkdocstrings`
+- **Dev**: `ruff`, `pyrefly`, `pytest`, `pytest-cov`, `pytest-mock`, `commitizen`, `pre-commit`, `bandit`, `zensical`, `mkdocstrings`
 
 ### Adding dependencies
 

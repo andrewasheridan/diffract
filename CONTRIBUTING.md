@@ -23,7 +23,7 @@ pre-commit install
 task check        # all gates: lint, format, typecheck, test, sdist
 task lint         # ruff check + autofix
 task format       # ruff format
-task typecheck    # mypy --strict
+task typecheck    # pyrefly check (strict preset)
 task test         # pytest with coverage
 ```
 

@@ -277,13 +277,17 @@ class TestHasPythonChangesIndex:
 
     def test_returns_false_when_index_diff_is_empty(self) -> None:
         repo = MagicMock()
-        repo.index.diff.return_value = []
+        repo.index.diff.return_value = list[MagicMock]()
         assert has_python_changes_index(repo) is False
 
     def test_returns_true_on_initial_commit(self) -> None:
         repo = MagicMock()
-        # Simulate initial commit: accessing head.commit raises ValueError.
-        type(repo.head).commit = property(lambda self: (_ for _ in ()).throw(ValueError("no HEAD")))
+
+        # Simulate an initial commit: accessing head.commit raises ValueError.
+        def raise_no_head(_self: object) -> MagicMock:
+            raise ValueError("no HEAD")
+
+        type(repo.head).commit = property(raise_no_head)
         assert has_python_changes_index(repo) is True
 
     def test_detects_py_change_via_b_path(self) -> None:
@@ -294,6 +298,6 @@ class TestHasPythonChangesIndex:
 
     def test_diff_called_with_head_commit(self) -> None:
         repo = MagicMock()
-        repo.index.diff.return_value = []
+        repo.index.diff.return_value = list[MagicMock]()
         has_python_changes_index(repo)
         repo.index.diff.assert_called_once_with(repo.head.commit)

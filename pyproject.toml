@@ -40,7 +40,7 @@ test = [
 dev = [
     { include-group = "test" },
     "ruff>=0.15.7",
-    "mypy>=1.19.1",
+    "pyrefly>=1.4.1",
     "commitizen>=4.13.9",
     "pre-commit>=4.5.1",
     "bandit[toml]>=1.9.4",
@@ -93,14 +93,21 @@ known-first-party = ["sheridan"]
 quote-style = "double"
 indent-style = "space"
 
-[tool.mypy]
-python_version = "3.14"
-strict = true
-warn_return_any = true
-warn_unused_configs = true
-mypy_path = "src"
-namespace_packages = true
-explicit_package_bases = true
+[tool.pyrefly]
+project-includes = ["src", "tests"]
+search-path = ["src"]
+python-version = "3.14.0"
+preset = "strict"
+check-unannotated-defs = true
+infer-return-types = "never"
+
+[tool.pyrefly.errors]
+implicit-any = "error"
+no-any-return = "error"
+method-assign = "error"
+unannotated-return = "error"
+implicit-any-parameter = "error"
+redundant-cast = "warn"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
