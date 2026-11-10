@@ -20,7 +20,7 @@ authors = [{ name = "sheridan", email = "andrewasheridan@gmail.com" }]
 #     "Topic :: Software Development",
 # ]
 dependencies = [
-    "sheridan-iceberg>=2.0.0",
+    "sheridan-iceberg>=2.0.0,<3",
     "gitpython"
 ]
 
@@ -29,13 +29,16 @@ Repository = "https://github.com/andrewasheridan/diffract"
 Issues = "https://github.com/andrewasheridan/diffract/issues"
 Changelog = "https://github.com/andrewasheridan/diffract/blob/main/CHANGELOG.md"
 
-[project.optional-dependencies]
-dev = [
-    "ruff>=0.15.7",
-    "mypy>=1.19.1",
+[dependency-groups]
+test = [
     "pytest>=9.0.2",
     "pytest-cov>=7.1.0",
     "pytest-mock>=3.14.0",
+]
+dev = [
+    { include-group = "test" },
+    "ruff>=0.15.7",
+    "mypy>=1.19.1",
     "commitizen>=4.13.9",
     "pre-commit>=4.5.1",
     "bandit[toml]>=1.9.4",
@@ -124,3 +127,4 @@ version_files = [
     ".pre-commit-config.yaml:rev: v.*# diffract",
 ]
 tag_format = "v$version"
+pre_bump_hooks = ["uv lock", "git add uv.lock"]

@@ -24,9 +24,6 @@ htmlcov/
 # Type checking
 .mypy_cache/
 
-# uv
-uv.lock
-
 # Editors
 .idea/
 .vscode/

@@ -44,7 +44,8 @@ test: add or update tests
 
 - Propose new runtime dependencies in a PR with a clear justification
 - Keep the runtime dependency list minimal
-- Dev dependencies go under `[project.optional-dependencies] dev`
+- Dev dependencies go under `[dependency-groups]`: test tools in `test`, everything else in `dev` (which includes `test`)
+- `uv.lock` is tracked: run `uv lock` after changing dependencies and commit it (`task lock:check` verifies it)
 
 ## Architecture Decision Records
 

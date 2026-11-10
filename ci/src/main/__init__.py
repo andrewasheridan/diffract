@@ -31,7 +31,7 @@ def _base(source: dagger.Directory) -> dagger.Container:
         .with_mounted_cache("/root/.cache/uv", dag.cache_volume("uv-cache"))
         .with_directory("/src", source)
         .with_workdir("/src")
-        .with_exec(["uv", "sync", "--all-extras", "--dev"])
+        .with_exec(["uv", "sync", "--locked"])
     )
 
 

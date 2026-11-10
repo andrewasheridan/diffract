@@ -14,7 +14,8 @@ task format         # ruff format
 task format:check   # ruff format --check (read-only, used in CI)
 task typecheck      # mypy --strict src/
 task test           # pytest --cov (coverage ≥ 90% required)
-task install        # uv sync --all-extras --dev
+task install        # uv sync (dev + test dependency groups)
+task lock:check     # uv lock --check (uv.lock is up to date)
 ```
 
 ## Architecture
