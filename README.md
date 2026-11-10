@@ -103,7 +103,12 @@ print(result.commit_type)  # reflects what is staged, not the last commit
 
 ### Validate commit messages with pre-commit or prek
 
-`diffract` ships a `commit-msg` hook that rejects commits whose conventional commit type doesn't match the detected API change — catching `fix:` when you actually removed a public name.
+`diffract` ships a `commit-msg` hook. The hook rejects a commit message only if the message tells less than the change to the public API:
+
+- If the commit removes a public name, the message must have a `!` (for example `feat!:` or `fix!:`) or a `BREAKING CHANGE:` footer.
+- If the commit adds a public name, the type must be `feat`, or the message must have a `!`.
+
+The detected type is only an estimate from the public names. Thus the hook accepts a message that tells more than the detected type. For example, it accepts `fix:` for a change to a function body, and `feat!:` for a breaking change in behavior.
 
 ```yaml
 # .pre-commit-config.yaml
@@ -125,7 +130,7 @@ diffract: commit type mismatch
   detected: feat(parser):
 ```
 
-Non-conventional commit types (`docs:`, `chore:`, `test:`, etc.) are never blocked.
+The hook checks only the `feat`, `fix` and `refactor` types. It never blocks other types (`docs:`, `chore:`, `test:` and so on).
 
 ### Configuration
 

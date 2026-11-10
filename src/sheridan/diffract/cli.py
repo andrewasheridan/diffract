@@ -7,6 +7,7 @@ import json
 import re
 import sys
 from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
 
 from sheridan.diffract import __version__
@@ -15,9 +16,25 @@ from sheridan.diffract.config import load_config
 from sheridan.diffract.enums import CommitType
 from sheridan.diffract.exceptions import DiffractError
 from sheridan.diffract.git_utils import get_repo
-from sheridan.diffract.models import DiffractResult, NameChange
+from sheridan.diffract.models import ApiDiff, DiffractResult, NameChange
 
 _COMMIT_TYPE_RE: re.Pattern[str] = re.compile(r"^(feat|fix|refactor)(\([^)]*\))?(!)?:")
+_BREAKING_FOOTER_RE: re.Pattern[str] = re.compile(r"^BREAKING[ -]CHANGE: ", re.MULTILINE)
+
+
+@dataclass(frozen=True)
+class _WrittenType:
+    """The commit type that a commit message gives.
+
+    Attributes:
+        prefix: The prefix as written, for example ``"fix(parser)!:"``.
+        base: The type without scope and ``!``: ``"feat"``, ``"fix"`` or ``"refactor"``.
+        breaking: True if the header has a ``!`` or the body has a ``BREAKING CHANGE:`` footer.
+    """
+
+    prefix: str
+    base: str
+    breaking: bool
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -81,7 +98,12 @@ def _build_parser() -> argparse.ArgumentParser:
         "--validate-msg-file",
         dest="validate_msg_file",
         metavar="MSGFILE",
-        help="Path to commit message file; validates written type against detected API change.",
+        help=(
+            "Path to a commit message file. The check fails only if the message tells less "
+            "than the API change: removed public names need a '!' or a 'BREAKING CHANGE:' "
+            "footer, and added public names need 'feat' or a '!'. "
+            "Types other than feat, fix and refactor are not checked."
+        ),
     )
 
     return parser
@@ -167,36 +189,55 @@ def _resolve_exit_code(result: DiffractResult, use_exit_code: bool) -> int:
     return 0
 
 
-def _parse_commit_type(first_line: str) -> CommitType | None:
-    """Parse the conventional commit type from the first line of a commit message.
+def _parse_written_type(message: str) -> _WrittenType | None:
+    """Parse the conventional commit type from a commit message.
 
-    Recognises ``feat``, ``feat!``, ``fix``, and ``refactor`` (with or without
-    a scope in parentheses). Any other prefix — including ``docs:``, ``chore:``,
-    ``test:``, etc. — returns ``None`` so that non-conventional commits are
-    never blocked.
+    Only ``feat``, ``fix`` and ``refactor`` (with or without a scope and a ``!``) are
+    recognised. Other types, for example ``docs:`` or ``chore:``, give ``None`` so that
+    diffract never blocks them.
 
     Args:
-        first_line: The first line of the commit message.
+        message: The full commit message. The type is in the first line. A
+            ``BREAKING CHANGE:`` or ``BREAKING-CHANGE:`` footer can be in the lines after it.
 
     Returns:
-        The matching :class:`~sheridan.diffract.enums.CommitType`, or ``None``
-        if the line does not start with a recognised conventional-commit type.
+        The written type, or ``None`` if the first line has no recognised type.
     """
+    lines = message.splitlines()
+    first_line = lines[0] if lines else ""
     m = _COMMIT_TYPE_RE.match(first_line)
     if m is None:
         return None
-    base, _scope, bang = m.group(1), m.group(2), m.group(3)
-    match (base, bool(bang)):
-        case ("feat", True):
-            return CommitType.feat_breaking
-        case ("feat", False):
-            return CommitType.feat
-        case ("fix", _):
-            return CommitType.fix
-        case ("refactor", _):
-            return CommitType.refactor
-        case _:
-            return None
+
+    body = "\n".join(lines[1:])
+    breaking = m.group(3) is not None or _BREAKING_FOOTER_RE.search(body) is not None
+
+    return _WrittenType(prefix=m.group(0), base=m.group(1), breaking=breaking)
+
+
+def _tells_less_than(written: _WrittenType, diff: ApiDiff) -> bool:
+    """Find if a written commit type tells less than the API change.
+
+    The detected type is only an estimate from the public names. Thus a message can
+    give more than the detected type, for example ``fix:`` for a change to a function
+    body, or ``feat!:`` for a change in behavior. A message fails only when it hides a
+    change to the public names:
+
+    - Removed public names, and the message is not breaking.
+    - Added public names, and the type is not ``feat`` and the message is not breaking.
+
+    Args:
+        written: The commit type from the message.
+        diff: The API diff for the commit.
+
+    Returns:
+        True if the message tells less than the API change.
+    """
+    if written.breaking:
+        return False
+    if diff.is_breaking:
+        return True
+    return diff.has_additions and written.base != "feat"
 
 
 def _extract_scope(first_line: str) -> str | None:
@@ -289,18 +330,16 @@ def main() -> None:
 
         _lines = raw.splitlines()
         first_line = _lines[0] if _lines else ""
-        written_type = _parse_commit_type(first_line)
+        written = _parse_written_type(raw)
         scope = _extract_scope(first_line)
 
-        if written_type is None:
-            sys.exit(0)
-        if written_type == result.commit_type:
+        if written is None or not _tells_less_than(written, result.diff):
             sys.exit(0)
 
         print(_format_human(result, scope=scope), file=sys.stderr)
         print(
             f"\ndiffract: commit type mismatch"
-            f"\n  written:  {_format_commit_type(written_type, scope)}"
+            f"\n  written:  {written.prefix}"
             f"\n  detected: {_format_commit_type(result.commit_type, scope)}",
             file=sys.stderr,
         )

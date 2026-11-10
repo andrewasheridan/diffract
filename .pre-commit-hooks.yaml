@@ -12,10 +12,10 @@
 - id: diffract-validate
   name: diffract (validate commit message type)
   description: >
-    Validates that the conventional commit type in the commit message matches
-    the API change diffract detects. Exits 0 on match or unrecognised type;
-    exits 1 on mismatch. Non-conventional commits (docs:, chore:, etc.) are
-    never blocked. Configure the source directory via diffract.toml or
+    Checks that the commit message tells the API change that diffract finds.
+    Removed public names need a '!' or a 'BREAKING CHANGE:' footer. Added
+    public names need 'feat' or a '!'. Exits 1 if the message tells less.
+    Types other than feat, fix and refactor are never blocked. Configure the source directory via diffract.toml or
     pyproject.toml [tool.diffract] rather than hook args.
   language: python
   entry: diffract --validate-msg-file

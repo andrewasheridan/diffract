@@ -62,21 +62,30 @@ def test_hook_accepts_a_matching_or_unchecked_type(hooked: GitRepo, message: str
 @pytest.mark.parametrize(
     ("text", "good", "bad"),
     [
-        pytest.param(
-            INITIAL_PACKAGE + "\n\ndef _helper() -> None:\n    pass\n", "refactor: x", "feat: x", id="internal"
-        ),
+        pytest.param(REMOVED, "feat!: x", "feat: x", id="removed"),
         pytest.param(
             INITIAL_PACKAGE.replace('"beta"]', '"beta", "gamma"]') + "gamma = 3\n", "feat: x", "fix: x", id="added"
         ),
     ],
 )
 def test_hook_checks_each_type(hooked: GitRepo, text: str, good: str, bad: str) -> None:
-    """The hook rejects the wrong type and then accepts the right one for the same staged change."""
+    """The hook rejects a type that tells less and then accepts the right one for the same staged change."""
     hooked.write("src/pkg/__init__.py", text)
 
     assert _commit(hooked, bad).returncode != 0
     assert _commit(hooked, good).returncode == 0
     assert _head_subject(hooked) == good
+
+
+@pytest.mark.parametrize("message", ["fix: x", "feat: x", "feat!: x", "refactor: x", "fix: x\n\nBREAKING CHANGE: y"])
+def test_hook_accepts_any_checked_type_for_an_internal_change(hooked: GitRepo, message: str) -> None:
+    """The detected type is only an estimate, so a change with no name change accepts each checked type."""
+    hooked.write("src/pkg/__init__.py", INITIAL_PACKAGE + "\n\ndef _helper() -> None:\n    pass\n")
+
+    proc = _commit(hooked, message)
+
+    assert proc.returncode == 0, proc.stderr
+    assert _head_subject(hooked) == message.splitlines()[0]
 
 
 def test_hook_ignores_the_last_commit(hooked: GitRepo) -> None:
