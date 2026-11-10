@@ -1,9 +1,12 @@
 """Tests for sheridan.diffract.git_utils."""
 
+import os
+import shutil
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from git import Repo
 
 from sheridan.diffract.exceptions import GitError, SurfaceError
 from sheridan.diffract.git_utils import (
@@ -180,9 +183,7 @@ class TestGetApiAtIndex:
         mock_tar_open: MagicMock,
         tree_sha: str = "abc123",
     ) -> None:
-        mock_tree = MagicMock()
-        mock_tree.hexsha = tree_sha
-        repo.index.write_tree.return_value = mock_tree
+        repo.git.write_tree.return_value = tree_sha
 
         mock_proc = MagicMock()
         mock_proc.stdout = MagicMock()
@@ -241,7 +242,7 @@ class TestGetApiAtIndex:
     ) -> None:
         # write_tree() failures are not wrapped — they propagate to the caller.
         repo = MagicMock()
-        repo.index.write_tree.side_effect = Exception("index error")
+        repo.git.write_tree.side_effect = Exception("index error")
 
         with pytest.raises(Exception, match="index error"):
             get_api_at_index(repo)
@@ -271,50 +272,69 @@ class TestGetApiAtIndex:
 class TestHasPythonChangesIndex:
     """Tests for has_python_changes_index()."""
 
-    def _diff_item(self, a_path: str, b_path: str) -> MagicMock:
-        item = MagicMock()
-        item.a_path = a_path
-        item.b_path = b_path
-        return item
+    def _repo(self, diff_output: str) -> MagicMock:
+        repo = MagicMock()
+        repo.head.is_valid.return_value = True
+        repo.git.diff.return_value = diff_output
+        return repo
 
     def test_returns_true_when_py_file_in_index_diff(self) -> None:
-        repo = MagicMock()
-        diff_item = self._diff_item("module.py", "module.py")
-        repo.index.diff.return_value = [diff_item]
-        assert has_python_changes_index(repo) is True
+        assert has_python_changes_index(self._repo("README.md\nmodule.py")) is True
 
     def test_returns_false_when_only_non_py_files_in_index_diff(self) -> None:
-        repo = MagicMock()
-        diff_item = self._diff_item("README.md", "README.md")
-        repo.index.diff.return_value = [diff_item]
-        assert has_python_changes_index(repo) is False
+        assert has_python_changes_index(self._repo("README.md")) is False
 
     def test_returns_false_when_index_diff_is_empty(self) -> None:
-        repo = MagicMock()
-        repo.index.diff.return_value = list[MagicMock]()
-        assert has_python_changes_index(repo) is False
+        assert has_python_changes_index(self._repo("")) is False
 
     def test_returns_true_on_initial_commit(self) -> None:
-        repo = MagicMock()
+        repo = self._repo("")
+        repo.head.is_valid.return_value = False
 
-        # Simulate an initial commit: accessing head.commit raises ValueError.
-        def raise_no_head(_self: object) -> MagicMock:
-            raise ValueError("no HEAD")
-
-        type(repo.head).commit = property(raise_no_head)
         assert has_python_changes_index(repo) is True
+        repo.git.diff.assert_not_called()
 
-    def test_detects_py_change_via_b_path(self) -> None:
-        repo = MagicMock()
-        diff_item = self._diff_item("", "new_module.py")
-        repo.index.diff.return_value = [diff_item]
-        assert has_python_changes_index(repo) is True
+    def test_diffs_the_index_against_head_with_the_git_command(self) -> None:
+        repo = self._repo("")
 
-    def test_diff_called_with_head_commit(self) -> None:
-        repo = MagicMock()
-        repo.index.diff.return_value = list[MagicMock]()
         has_python_changes_index(repo)
-        repo.index.diff.assert_called_once_with(repo.head.commit)
+
+        repo.git.diff.assert_called_once_with("--cached", "--name-only", "--no-renames", "HEAD")
+        repo.index.diff.assert_not_called()
+
+
+class TestStagingAreaInARealRepository:
+    """Run the index functions on a real repository with a temporary ``GIT_INDEX_FILE``."""
+
+    def test_functions_read_git_index_file_and_do_not_write_git_index(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        for key in [key for key in os.environ if key.startswith("GIT_")]:
+            monkeypatch.delenv(key)
+        monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+        monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
+        for role in ("AUTHOR", "COMMITTER"):
+            monkeypatch.setenv(f"GIT_{role}_NAME", "Test")
+            monkeypatch.setenv(f"GIT_{role}_EMAIL", "test@example.com")
+
+        repo = Repo.init(tmp_path, initial_branch="main")
+        (tmp_path / "README.md").write_text("# pkg\n", encoding="utf-8")
+        repo.git.add("README.md")
+        repo.git.commit("--quiet", "--no-verify", "--no-gpg-sign", "-m", "docs: x")
+        index = tmp_path / ".git" / "index"
+        staged = index.read_bytes()
+
+        (tmp_path / "mod.py").write_text('__all__ = ["alpha"]\n\nalpha = 1\n', encoding="utf-8")
+        temporary_index = tmp_path / "temporary-index"
+        shutil.copyfile(index, temporary_index)
+        monkeypatch.setenv("GIT_INDEX_FILE", str(temporary_index))
+        repo.git.add("mod.py")
+
+        assert has_python_changes_index(repo) is True
+        assert get_api_at_index(repo, src_path="src") == {"mod": ["alpha"]}
+        assert index.read_bytes() == staged
 
 
 class TestReadApi:
