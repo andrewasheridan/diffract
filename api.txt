@@ -1,0 +1,35 @@
+package sheridan.diffract
+├── __version__: str
+├── class ApiDiff
+│   ├── added: tuple[NameChange, ...]
+│   ├── removed: tuple[NameChange, ...]
+│   ├── property is_breaking: bool
+│   ├── property has_additions: bool
+│   └── property is_empty: bool
+├── class ChangeKind(StrEnum)
+│   ├── added
+│   └── removed
+├── class CommitType(StrEnum)
+│   ├── feat
+│   ├── feat_breaking
+│   ├── fix
+│   └── refactor
+├── class DiffractConfig
+│   └── src: str | None
+├── class DiffractError(Exception)
+├── class DiffractResult
+│   ├── commit_type: CommitType
+│   ├── summary: str
+│   ├── diff: ApiDiff
+│   ├── base_ref: str
+│   ├── head_ref: str
+│   └── def to_dict(self) -> dict[str, object]
+├── class GitError(DiffractError)
+├── class NameChange
+│   ├── module: str
+│   ├── name: str
+│   └── kind: ChangeKind
+├── class SurfaceError(DiffractError)
+├── def check(base_ref: str = 'HEAD~1', head_ref: str = 'HEAD', repo_path: Path | None = None, src_path: str = 'src') -> DiffractResult
+├── def check_staged(repo_path: Path | None = None, src_path: str = 'src') -> DiffractResult
+└── def load_config(repo_root: Path) -> DiffractConfig

@@ -22,12 +22,17 @@ uv run prek install
 ## Running checks
 
 ```bash
-task check        # all gates: lint, format, typecheck, test, sdist
+task check        # all gates: lint, format, typecheck, test, sdist, api
 task lint         # ruff check + autofix
 task format       # ruff format
 task typecheck    # pyrefly check (strict preset)
 task test         # pytest with coverage
+task api:update   # write the public API to api.txt
 ```
+
+`api.txt` is the public API of `src/sheridan/`, as `iceberg` shows it. `task api:check`
+fails when the public API is different from `api.txt`. When you change the public API on
+purpose, run `task api:update` and commit `api.txt` with your change.
 
 ## Commit format
 
@@ -70,7 +75,8 @@ task typecheck
 task test
 task security:check
 task sdist:check
+task api:check
 task docs:build
 ```
 
-`task check` runs lint, format, typecheck, test and the sdist check.
+`task check` runs lint, format, typecheck, test, the sdist check and the API check.

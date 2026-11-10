@@ -45,6 +45,9 @@ jobs:
       - name: security
         if: ${{ !cancelled() && steps.sync.outcome == 'success' }}
         run: task security:check
+      - name: api
+        if: ${{ !cancelled() && steps.sync.outcome == 'success' }}
+        run: task api:check
       - name: docs
         if: ${{ !cancelled() && steps.sync.outcome == 'success' }}
         run: task docs:build

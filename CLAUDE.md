@@ -7,8 +7,8 @@ does not read the AST itself: `sheridan-iceberg` extracts the public API.
 ## Check command
 
 Run `task check` before you say that a change is done. It runs these gates:
-`lint:check`, `format:check`, `typecheck` (pyrefly), `test` and `sdist:check`. All gates
-must pass. CI also runs `lock:check`, `security:check` and `docs:build`.
+`lint:check`, `format:check`, `typecheck` (pyrefly), `test`, `sdist:check` and
+`api:check`. All gates must pass. CI also runs `lock:check`, `security:check` and `docs:build`.
 `CONTRIBUTING.md` lists the other tasks.
 
 ## Architecture
