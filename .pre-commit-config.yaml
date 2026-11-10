@@ -6,13 +6,14 @@ repos:
         args: [--fix]
       - id: ruff-format
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.19.1
+  - repo: local
     hooks:
-      - id: mypy
-        args: [--strict]
-        files: ^src/
-        additional_dependencies: [gitpython, sheridan-iceberg]
+      - id: pyrefly
+        name: pyrefly
+        language: system
+        entry: uv run --frozen pyrefly check
+        pass_filenames: false
+        files: ^(src|tests)/.*\.pyi?$
 
   # Dogfooding hook temporarily disabled: diffract-validate is currently broken.
   # - repo: https://github.com/andrewasheridan/diffract
