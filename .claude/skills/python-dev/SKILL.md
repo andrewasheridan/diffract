@@ -32,7 +32,7 @@ The project uses pyrefly, not mypy. Do not run mypy.
 - Propose a new dependency in an issue first. Add it only after the maintainer approves
   it. Then run `uv lock` and commit `uv.lock`.
 - Before you propose a new runtime dependency, run the dependency auditor. A human
-  review can overrule the auditor: `docs/decisions/003-gitpython.md` tells why
+  review can overrule the auditor: the "Dependencies" section of `CLAUDE.md` tells why
   `gitpython` is a dependency.
 - The package code is in `src/sheridan/diffract/`. The tests are in `tests/unit/` and
   `tests/functional/`. The name of a unit test file is `test_<module>.py`, for example

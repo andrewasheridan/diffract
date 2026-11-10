@@ -62,7 +62,7 @@ only one possible meaning.
 
 The rule applies to:
 
-- `README.md`, `CONTRIBUTING.md` and the files in `docs/` (ADRs too)
+- `README.md`, `CONTRIBUTING.md` and the files in `docs/`
 - docstrings and code comments
 - CLI help text, error and log messages
 - issue, commit and PR bodies
@@ -156,11 +156,6 @@ This is guidance, not a lint rule. Reviewers apply it.
   other tools in `dev`, which includes `test`.
 - This repo tracks `uv.lock`. After you change dependencies, run `uv lock` and commit
   `uv.lock`. `task lock:check` makes sure that `uv.lock` is current.
-
-## Architecture decision records
-
-`docs/decisions/` has the architecture decision records (ADRs). Write an ADR for each
-important decision that is not clear from the code.
 
 ## CI pipeline
 

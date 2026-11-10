@@ -1,6 +1,6 @@
 ---
 name: ste100
-description: Write in ASD-STE100 Simplified Technical English (STE). Use when you write or edit prose in this repo - README, CONTRIBUTING, docs and ADRs, docstrings, code comments, user-facing messages (CLI help, errors, logs), issue, commit and pull request bodies.
+description: Write in ASD-STE100 Simplified Technical English (STE). Use when you write or edit prose in this repo - README, CONTRIBUTING, docs, docstrings, code comments, user-facing messages (CLI help, errors, logs), issue, commit and pull request bodies.
 ---
 
 # ASD-STE100 Simplified Technical English
@@ -14,7 +14,7 @@ contains the full rules and the dictionary of approved words.
 
 | Applies | Does not apply |
 |---|---|
-| `README.md`, `CONTRIBUTING.md`, `docs/` (ADRs too) | Code identifiers (names of functions, variables, classes) |
+| `README.md`, `CONTRIBUTING.md`, `docs/` | Code identifiers (names of functions, variables, classes) |
 | Docstrings and code comments, in `src/` and `tests/` | Quoted output, error text from other tools |
 | CLI help text, error and log messages | Conventional Commits header syntax (`feat(cli): ...`) |
 | Issue, commit and PR bodies | `CHANGELOG.md` (the release process makes it) |

@@ -40,7 +40,8 @@ change to a function body. It also accepts `feat!:` for a breaking change in beh
 
 The hook compares `HEAD` with the git staging area, not `HEAD~1` with `HEAD`. Thus it
 finds the change in the commit that you make now, not the change in the last commit.
-[ADR 005](decisions/005-staged-index-comparison.md) gives the reason.
+git runs the `commit-msg` hook before it makes the new commit. Thus `HEAD` is still the
+last commit, and the staging area has the content of the new commit.
 
 ## Output
 
