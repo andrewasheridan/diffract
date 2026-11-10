@@ -33,7 +33,9 @@ Other modules:
 - `config.py`: reads `src` from `diffract.toml` or from `[tool.diffract]` in
   `pyproject.toml`. The `--src` flag has priority over both files.
 - `cli.py`: the `diffract` command. With `--validate-msg-file` and no refs, it compares
-  `HEAD` with the staging area. This is the `commit-msg` hook mode.
+  `HEAD` with the staging area. This is the `commit-msg` hook mode. The check fails
+  only if the message tells less than the API change: removed names need a `!` or a
+  `BREAKING CHANGE:` footer, and added names need `feat` or a `!`.
 
 diffract compares names only. It does not compare signatures, and it does not change
 commits. `docs/decisions/` has the architecture decision records (ADRs).

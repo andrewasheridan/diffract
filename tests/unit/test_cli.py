@@ -10,8 +10,10 @@ from sheridan.diffract.cli import (
     _extract_scope,
     _format_commit_type,
     _format_human,
-    _parse_commit_type,
+    _parse_written_type,
     _resolve_exit_code,
+    _tells_less_than,
+    _WrittenType,
     main,
 )
 from sheridan.diffract.config import DiffractConfig
@@ -277,19 +279,25 @@ class TestMain:
         assert kwargs["src_path"] == "src"
 
 
-class TestParseCommitType:
-    """Unit tests for _parse_commit_type()."""
+class TestParseWrittenType:
+    """Unit tests for _parse_written_type()."""
 
     @pytest.mark.parametrize(
-        ("first_line", "expected"),
+        ("message", "expected"),
         [
-            ("feat: add thing", CommitType.feat),
-            ("feat!: remove thing", CommitType.feat_breaking),
-            ("feat(api)!: remove thing", CommitType.feat_breaking),
-            ("feat(api): add thing", CommitType.feat),
-            ("fix: correct bug", CommitType.fix),
-            ("fix(parser): correct bug", CommitType.fix),
-            ("refactor: restructure", CommitType.refactor),
+            ("feat: add thing", _WrittenType("feat:", "feat", breaking=False)),
+            ("feat!: remove thing", _WrittenType("feat!:", "feat", breaking=True)),
+            ("feat(api)!: remove thing", _WrittenType("feat(api)!:", "feat", breaking=True)),
+            ("feat(api): add thing", _WrittenType("feat(api):", "feat", breaking=False)),
+            ("fix: correct bug", _WrittenType("fix:", "fix", breaking=False)),
+            ("fix(parser): correct bug", _WrittenType("fix(parser):", "fix", breaking=False)),
+            ("fix!: correct bug", _WrittenType("fix!:", "fix", breaking=True)),
+            ("refactor: restructure", _WrittenType("refactor:", "refactor", breaking=False)),
+            ("refactor!: restructure", _WrittenType("refactor!:", "refactor", breaking=True)),
+            ("fix: x\n\nBREAKING CHANGE: y", _WrittenType("fix:", "fix", breaking=True)),
+            ("fix: x\n\nBREAKING-CHANGE: y", _WrittenType("fix:", "fix", breaking=True)),
+            ("fix: BREAKING CHANGE: y", _WrittenType("fix:", "fix", breaking=False)),
+            ("fix: x\n\nNot a BREAKING CHANGE: y", _WrittenType("fix:", "fix", breaking=False)),
             ("docs: update readme", None),
             ("chore: bump deps", None),
             ("", None),
@@ -297,8 +305,58 @@ class TestParseCommitType:
             ("   ", None),
         ],
     )
-    def test_parse(self, first_line: str, expected: CommitType | None) -> None:
-        assert _parse_commit_type(first_line) == expected
+    def test_parse(self, message: str, expected: _WrittenType | None) -> None:
+        assert _parse_written_type(message) == expected
+
+
+class TestTellsLessThan:
+    """Unit tests for _tells_less_than(): the message fails only when it hides an API change."""
+
+    @pytest.mark.parametrize("message", ["feat: x", "feat!: x", "fix: x", "fix!: x", "refactor: x", "refactor!: x"])
+    def test_no_name_change_always_passes(self, message: str, empty_diff: ApiDiff) -> None:
+        written = _parse_written_type(message)
+        assert written is not None
+        assert not _tells_less_than(written, empty_diff)
+
+    @pytest.mark.parametrize(
+        ("message", "expected"),
+        [
+            ("feat!: x", False),
+            ("fix!: x", False),
+            ("refactor!: x", False),
+            ("feat: x\n\nBREAKING CHANGE: y", False),
+            ("fix: x\n\nBREAKING CHANGE: y", False),
+            ("feat: x", True),
+            ("fix: x", True),
+            ("refactor: x", True),
+        ],
+    )
+    def test_removed_names_need_breaking(self, message: str, expected: bool, removal_diff: ApiDiff) -> None:
+        written = _parse_written_type(message)
+        assert written is not None
+        assert _tells_less_than(written, removal_diff) is expected
+
+    @pytest.mark.parametrize(
+        ("message", "expected"),
+        [
+            ("feat: x", False),
+            ("feat!: x", False),
+            ("fix!: x", False),
+            ("refactor!: x", False),
+            ("fix: x", True),
+            ("refactor: x", True),
+        ],
+    )
+    def test_added_names_need_feat_or_bang(self, message: str, expected: bool, addition_diff: ApiDiff) -> None:
+        written = _parse_written_type(message)
+        assert written is not None
+        assert _tells_less_than(written, addition_diff) is expected
+
+    @pytest.mark.parametrize(("message", "expected"), [("feat: x", True), ("feat!: x", False)])
+    def test_mixed_change_needs_breaking(self, message: str, expected: bool, mixed_diff: ApiDiff) -> None:
+        written = _parse_written_type(message)
+        assert written is not None
+        assert _tells_less_than(written, mixed_diff) is expected
 
 
 class TestValidateMsgFile:
@@ -535,6 +593,71 @@ class TestValidateMsgFile:
         with pytest.raises(SystemExit) as exc_info:
             main()
         assert exc_info.value.code == 0
+
+    @pytest.mark.parametrize(
+        ("message", "commit_type", "diff_fixture"),
+        [
+            pytest.param("fix: correct off-by-one\n", CommitType.refactor, "empty_diff", id="fix-body-change"),
+            pytest.param("feat: new behavior\n", CommitType.refactor, "empty_diff", id="feat-no-new-name"),
+            pytest.param("feat!: new behavior\n", CommitType.refactor, "empty_diff", id="feat-bang-no-removal"),
+            pytest.param("fix!: remove Bar\n", CommitType.feat_breaking, "removal_diff", id="fix-bang-removal"),
+            pytest.param("refactor!: remove Bar\n", CommitType.feat_breaking, "removal_diff", id="refactor-bang"),
+            pytest.param(
+                "fix: remove Bar\n\nBREAKING CHANGE: Bar is gone.\n",
+                CommitType.feat_breaking,
+                "removal_diff",
+                id="breaking-footer",
+            ),
+            pytest.param("fix!: add NewClass\n", CommitType.feat, "addition_diff", id="fix-bang-addition"),
+        ],
+    )
+    def test_message_that_tells_enough_exits_zero(
+        self,
+        message: str,
+        commit_type: CommitType,
+        diff_fixture: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        request: pytest.FixtureRequest,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        """A message that tells the same as or more than the API change passes."""
+        msg_file = tmp_path / "COMMIT_EDITMSG"
+        msg_file.write_text(message, encoding="utf-8")
+        result = _make_result(commit_type, request.getfixturevalue(diff_fixture))
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
+        monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 0
+
+    @pytest.mark.parametrize(
+        ("message", "commit_type", "diff_fixture"),
+        [
+            pytest.param("feat: remove Bar\n", CommitType.feat_breaking, "removal_diff", id="feat-removal"),
+            pytest.param("refactor: remove Bar\n", CommitType.feat_breaking, "removal_diff", id="refactor-removal"),
+            pytest.param("refactor: add NewClass\n", CommitType.feat, "addition_diff", id="refactor-addition"),
+        ],
+    )
+    def test_message_that_tells_less_exits_one(
+        self,
+        message: str,
+        commit_type: CommitType,
+        diff_fixture: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        request: pytest.FixtureRequest,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        """A message that hides a removed or an added public name fails."""
+        msg_file = tmp_path / "COMMIT_EDITMSG"
+        msg_file.write_text(message, encoding="utf-8")
+        result = _make_result(commit_type, request.getfixturevalue(diff_fixture))
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
+        monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 1
 
     def test_missing_file_exits_three(
         self,
