@@ -30,8 +30,8 @@ arguments. Read [Configuration](configuration.md).
 
 | Change that diffract finds | Types that pass |
 |---|---|
-| A public name was removed (`feat!`) | Any type with a `!` or a `BREAKING CHANGE:` footer |
-| A public name was added (`feat`) | `feat`, or any type with a `!` or a `BREAKING CHANGE:` footer |
+| A public name was removed or had a breaking change (`feat!`) | Any type with a `!` or a `BREAKING CHANGE:` footer |
+| A public name was added or had a change that adds to it (`feat`) | `feat`, or any type with a `!` or a `BREAKING CHANGE:` footer |
 | Python files in the source directory changed (`code`) | `fix`, `refactor`, `perf`, `style` or `feat`, or any type with a `!` or a `BREAKING CHANGE:` footer |
 | Only Python files in the test directory changed (`test`) | `test` |
 | All other changes (`other`) | `docs`, `ci`, `chore` or `build` |

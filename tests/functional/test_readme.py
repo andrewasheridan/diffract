@@ -94,7 +94,10 @@ def test_src_json_and_exit_code(readme_repo: GitRepo) -> None:
 
     data = json.loads(readme_repo.diffract("--src", "lib/", "--json").stdout)
     assert data["group"] == "feat"
-    assert "- `2`: with `--exit-code`, a change that is not breaking (a public name was added)." in README
+    assert (
+        "- `2`: with `--exit-code`, a change that is not breaking "
+        "(a public name was added, or had a change that adds to it)." in README
+    )
 
 
 def test_scope_in_the_suggestion_and_the_mismatch(readme_repo: GitRepo, tmp_path: Path) -> None:
@@ -150,7 +153,11 @@ def test_configuration_files(readme_repo: GitRepo, filename: str, text: str) -> 
 
     data = json.loads(readme_repo.diffract("--json").stdout)
 
-    assert data["diff"] == {"added": [{"module": "sheridan.diffract", "name": "OldHelper"}], "removed": []}
+    assert data["diff"] == {
+        "added": [{"module": "sheridan.diffract", "name": "OldHelper"}],
+        "removed": [],
+        "changed": [],
+    }
 
     readme_repo.write("python/tests/test_helpers.py", "def test_helper() -> None:\n    assert True\n")
     readme_repo.commit("test: add a test")

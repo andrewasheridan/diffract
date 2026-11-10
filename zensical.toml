@@ -9,6 +9,7 @@ nav = [
   {"Home" = "index.md"},
   {"Getting started" = "getting-started.md"},
   {"Configuration" = "configuration.md"},
+  {"API changes" = "api-changes.md"},
   {"CLI and exit codes" = "cli.md"},
   {"commit-msg hook" = "commit-msg-hook.md"},
   {"GitHub Actions" = "github-actions.md"},

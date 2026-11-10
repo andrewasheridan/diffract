@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 from git import Repo
 
+from sheridan.diffract.differ import ApiSurface, public_names
 from sheridan.diffract.exceptions import GitError, SurfaceError
 from sheridan.diffract.git_utils import (
     get_api_at_index,
@@ -18,6 +19,12 @@ from sheridan.diffract.git_utils import (
     has_python_changes,
 )
 from sheridan.iceberg import Assignment, Module, Package
+
+
+def _known(api: ApiSurface | None) -> ApiSurface:
+    """Check that the source directory exists, then give its API."""
+    assert api is not None
+    return api
 
 
 def _module(name: str, *names: str) -> Module:
@@ -199,7 +206,7 @@ class TestGetApiAtRef:
         mocker.patch("sheridan.diffract.git_utils.get_public_api", return_value=_container(tmp_path / "src"))
         self._setup_archive_mocks(repo, tmp_path, mock_tmpdir, mock_tar_open)
 
-        assert get_api_at_ref(repo, "HEAD") == {"mypackage.mod": ["Bar", "Foo"]}
+        assert public_names(_known(get_api_at_ref(repo, "HEAD"))) == {"mypackage.mod": ["Bar", "Foo"]}
 
     def test_returns_none_when_src_path_missing(
         self,
@@ -236,7 +243,7 @@ class TestGetApiAtRef:
         mocker.patch("sheridan.diffract.git_utils.get_public_api", side_effect=capture)
         self._setup_archive_mocks(repo, tmp_path, mock_tmpdir, mock_tar_open)
 
-        assert get_api_at_ref(repo, "HEAD", src_path=".") == {"mypackage.mod": ["Bar", "Foo"]}
+        assert public_names(_known(get_api_at_ref(repo, "HEAD", src_path="."))) == {"mypackage.mod": ["Bar", "Foo"]}
         assert captured == [tmp_path]
 
     def test_archives_only_the_src_path(
@@ -357,7 +364,7 @@ class TestGetApiAtIndex:
         mocker.patch("sheridan.diffract.git_utils.get_public_api", return_value=_container(tmp_path / "src"))
         self._setup_index_mocks(repo, tmp_path, mock_tmpdir, mock_tar_open)
 
-        assert get_api_at_index(repo) == {"mypackage.mod": ["Bar", "Foo"]}
+        assert public_names(_known(get_api_at_index(repo))) == {"mypackage.mod": ["Bar", "Foo"]}
 
     def test_uses_tree_sha_for_archive(
         self,
@@ -477,7 +484,7 @@ class TestStagingAreaInARealRepository:
         repo.git.add("mod.py")
 
         assert get_changed_paths_index(repo) == ["mod.py"]
-        assert get_api_at_index(repo, src_path=".") == {"mod": ["alpha"]}
+        assert public_names(_known(get_api_at_index(repo, src_path="."))) == {"mod": ["alpha"]}
         assert index.read_bytes() == staged
 
 
@@ -490,7 +497,7 @@ class TestReadApi:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(text, encoding="utf-8")
 
-    def _api(self, tmp_path: Path, src_path: str, mocker: pytest.fixture) -> dict[str, list[str]]:  # type: ignore[type-arg]
+    def _api(self, tmp_path: Path, src_path: str, mocker: pytest.fixture) -> ApiSurface:  # type: ignore[type-arg]
         """Run ``get_api_at_ref`` with the archive step mocked, so that iceberg reads ``tmp_path``."""
         repo = MagicMock()
         mocker.patch("sheridan.diffract.git_utils.tarfile.open")
@@ -505,7 +512,7 @@ class TestReadApi:
         source = 'from os import sep\n__all__ = ["sep", "f", "C", "X"]\nX = 1\nclass C: ...\ndef f() -> None: ...\n'
         self._write(tmp_path, {"src/pkg/__init__.py": source})
 
-        assert self._api(tmp_path, "src", mocker) == {"pkg": ["C", "X", "f", "sep"]}
+        assert public_names(self._api(tmp_path, "src", mocker)) == {"pkg": ["C", "X", "f", "sep"]}
 
     def test_names_do_not_include_the_source_directory(
         self,
@@ -522,23 +529,23 @@ class TestReadApi:
             },
         )
 
-        assert self._api(tmp_path, "lib", mocker) == {"top": ["top"], "pkg": ["A"], "pkg.sub.mod": ["B"]}
+        assert public_names(self._api(tmp_path, "lib", mocker)) == {"top": ["top"], "pkg": ["A"], "pkg.sub.mod": ["B"]}
 
     def test_keeps_the_name_of_a_package_root(self, tmp_path: Path, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
         """Must keep the package name if ``src_path`` is a package."""
         self._write(tmp_path, {"src/pkg/__init__.py": "A = 1\n", "src/pkg/mod.py": "B = 2\n"})
 
-        assert self._api(tmp_path, "src/pkg", mocker) == {"pkg": ["A"], "pkg.mod": ["B"]}
+        assert public_names(self._api(tmp_path, "src/pkg", mocker)) == {"pkg": ["A"], "pkg.mod": ["B"]}
 
     def test_skips_private_modules(self, tmp_path: Path, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
         """Must not give the names in a private module."""
         self._write(tmp_path, {"src/pkg/__init__.py": "A = 1\n", "src/pkg/_impl.py": "B = 2\n"})
 
-        assert self._api(tmp_path, "src", mocker) == {"pkg": ["A"]}
+        assert public_names(self._api(tmp_path, "src", mocker)) == {"pkg": ["A"]}
 
     def test_accepts_a_single_module(self, tmp_path: Path, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
         """Must accept a ``Module`` from iceberg, which it gives for one file."""
         (tmp_path / "src").mkdir()
         mocker.patch("sheridan.diffract.git_utils.get_public_api", return_value=_module("solo", "X"))
 
-        assert self._api(tmp_path, "src", mocker) == {"solo": ["X"]}
+        assert public_names(self._api(tmp_path, "src", mocker)) == {"solo": ["X"]}

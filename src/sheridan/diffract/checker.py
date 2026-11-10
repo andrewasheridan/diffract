@@ -5,7 +5,7 @@ __all__ = ["check", "check_staged"]
 from pathlib import Path
 
 from sheridan.diffract.classifier import classify
-from sheridan.diffract.differ import diff_surfaces
+from sheridan.diffract.differ import ApiSurface, diff_surfaces
 from sheridan.diffract.enums import CommitType
 from sheridan.diffract.exceptions import SurfaceError
 from sheridan.diffract.git_utils import (
@@ -18,16 +18,14 @@ from sheridan.diffract.git_utils import (
 )
 from sheridan.diffract.models import ApiDiff, DiffractResult
 
-type _Surface = dict[str, list[str]]
-
 
 def _resolve_surfaces(
-    base: _Surface | None,
-    head: _Surface | None,
+    base: ApiSurface | None,
+    head: ApiSurface | None,
     src_path: str,
     base_ref: str,
     head_ref: str,
-) -> tuple[_Surface, _Surface]:
+) -> tuple[ApiSurface, ApiSurface]:
     """Replace a missing source directory with an empty API.
 
     If ``src_path`` does not exist at one ref, the API at that ref is empty. diffract

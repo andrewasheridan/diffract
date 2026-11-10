@@ -70,6 +70,15 @@ def test_hook_accepts_a_possible_type_or_a_git_message(hooked: GitRepo, message:
             INITIAL_PACKAGE.replace('"beta"]', '"beta", "gamma"]') + "gamma = 3\n", "feat: x", "fix: x", id="added"
         ),
         pytest.param(INITIAL_PACKAGE + "\n\ndef _helper() -> None:\n    pass\n", "fix: x", "docs: x", id="code"),
+        pytest.param(
+            INITIAL_PACKAGE.replace("def beta()", "def beta(scale: int)"), "feat!: x", "fix: x", id="new-parameter"
+        ),
+        pytest.param(
+            INITIAL_PACKAGE.replace("def beta()", "def beta(scale: int = 1)"),
+            "feat: x",
+            "fix: x",
+            id="new-optional-parameter",
+        ),
     ],
 )
 def test_hook_checks_each_type(hooked: GitRepo, text: str, good: str, bad: str) -> None:

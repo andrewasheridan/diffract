@@ -48,7 +48,7 @@ def test_json_reports_the_classification(
     assert data["group"] == group
     assert data["base_ref"] == "HEAD~1"
     assert data["head_ref"] == "HEAD"
-    assert data["diff"] == {"added": added, "removed": removed}
+    assert data["diff"] == {"added": added, "removed": removed, "changed": []}
 
 
 def test_addition_and_removal_together_is_breaking(repo: GitRepo) -> None:
@@ -62,6 +62,7 @@ def test_addition_and_removal_together_is_breaking(repo: GitRepo) -> None:
     assert data["diff"] == {
         "added": [{"module": "pkg", "name": "delta"}],
         "removed": [{"module": "pkg", "name": "beta"}],
+        "changed": [],
     }
 
 
@@ -148,3 +149,35 @@ def test_tests_flag_and_config_files(repo: GitRepo) -> None:
     assert _json(repo)["group"] == "test"
     repo.write("diffract.toml", 'tests = "tests"\n')
     assert _json(repo)["group"] == "code"
+
+
+def test_json_reports_the_signature_changes(repo: GitRepo) -> None:
+    """A changed signature gives ``feat!`` or ``feat``, and ``--json`` gives each change in ``changed``."""
+    text = INITIAL_PACKAGE.replace("def alpha()", "def alpha(*, scale: int = 1)").replace("def beta()", "def beta(x)")
+    repo.write("src/pkg/__init__.py", text)
+    repo.commit("change signatures")
+
+    data = _json(repo)
+
+    assert data["group"] == "feat!"
+    assert data["diff"] == {
+        "added": [],
+        "removed": [],
+        "changed": [
+            {"module": "pkg", "name": "alpha", "detail": "optional parameter 'scale' was added", "breaking": False},
+            {"module": "pkg", "name": "beta", "detail": "necessary parameter 'x' was added", "breaking": True},
+        ],
+    }
+
+
+def test_text_output_lists_the_signature_changes(repo: GitRepo) -> None:
+    """The text output gives the breaking changes and the changes that only add to a name."""
+    text = INITIAL_PACKAGE.replace("def alpha()", "def alpha(*, scale: int = 1)").replace("def beta()", "def beta(x)")
+    repo.write("src/pkg/__init__.py", text)
+    repo.commit("change signatures")
+
+    proc = repo.diffract()
+
+    assert proc.returncode == 0, proc.stderr
+    assert "Breaking changes:\n  pkg:\n    ! beta: necessary parameter 'x' was added" in proc.stdout
+    assert "Changes that add to public names:\n  pkg:\n    ~ alpha: optional parameter 'scale' was added" in proc.stdout

@@ -12,7 +12,7 @@ from typing import NoReturn, override
 
 from sheridan.diffract import __version__
 from sheridan.diffract.checker import check, check_staged
-from sheridan.diffract.classifier import group_by_module
+from sheridan.diffract.classifier import group_by_module, group_changes_by_module
 from sheridan.diffract.config import load_config
 from sheridan.diffract.enums import CommitType
 from sheridan.diffract.exceptions import DiffractError
@@ -145,7 +145,10 @@ def _build_parser() -> argparse.ArgumentParser:
         "--exit-code",
         action="store_true",
         dest="exit_code",
-        help="Exit 1 if a public name was removed, 2 if a public name was added, and 0 if no public name changed.",
+        help=(
+            "Exit 1 if a public name was removed or had a breaking change, 2 if a public name was added "
+            "or had a change that only adds to it, and 0 if no public name changed."
+        ),
     )
     parser.add_argument(
         "--validate-msg-file",
@@ -153,10 +156,10 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="MSGFILE",
         help=(
             "The path of a commit message file. The check fails if the commit type is not "
-            "possible for the change. Removed public names need a '!' or a 'BREAKING CHANGE:' "
-            "footer. Added public names need 'feat' or a '!'. Code changes need fix, refactor, "
-            "perf, style, feat or a '!'. Test changes need test. Other changes need docs, ci, "
-            "chore or build. A message with no known type fails. diffract does not check "
+            "possible for the change. Removed public names and breaking changes need a '!' or a "
+            "'BREAKING CHANGE:' footer. Added public names need 'feat' or a '!'. Code changes need "
+            "fix, refactor, perf, style, feat or a '!'. Test changes need test. Other changes need "
+            "docs, ci, chore or build. A message with no known type fails. diffract does not check "
             "merge, revert, fixup and squash messages from git."
         ),
     )
@@ -202,6 +205,18 @@ def _format_human(result: DiffractResult, scope: str | None = None) -> str:
                 lines.append(f"  {module}:")
                 for name in names:
                     lines.append(f"    + {name}")
+        if result.diff.breaking_changes:
+            lines.append("Breaking changes:")
+            for module, texts in group_changes_by_module(result.diff.breaking_changes).items():
+                lines.append(f"  {module}:")
+                for text in texts:
+                    lines.append(f"    ! {text}")
+        if result.diff.additive_changes:
+            lines.append("Changes that add to public names:")
+            for module, texts in group_changes_by_module(result.diff.additive_changes).items():
+                lines.append(f"  {module}:")
+                for text in texts:
+                    lines.append(f"    ~ {text}")
 
     lines.append("")
     if result.commit_type in _FEATURE_TYPES:
@@ -235,8 +250,9 @@ def _resolve_exit_code(result: DiffractResult, use_exit_code: bool) -> int:
 
     Returns:
         ``0`` if ``use_exit_code`` is ``False``. If ``use_exit_code`` is ``True``:
-        ``1`` if a public name was removed, ``2`` if a public name was added, and
-        ``0`` if no public name changed.
+        ``1`` if a public name was removed or had a breaking change, ``2`` if a
+        public name was added or had a change that only adds to it, and ``0`` if no
+        public name changed.
     """
     if not use_exit_code:
         return 0
@@ -359,9 +375,10 @@ def main() -> None:
 
     The exit codes:
       - 0: No public name changed, or the command has no ``--exit-code`` flag.
-      - 1: A public name was removed (with ``--exit-code``), or the commit type in
-        the commit message is not possible for the change.
-      - 2: A public name was added and no public name was removed (with ``--exit-code``).
+      - 1: A public name was removed or had a breaking change (with ``--exit-code``),
+        or the commit type in the commit message is not possible for the change.
+      - 2: A public name was added or had a change that only adds to it, and no
+        breaking change occurred (with ``--exit-code``).
       - 3: An error. This can be a usage error, a git, file or configuration error, or
         an unexpected exception.
     """

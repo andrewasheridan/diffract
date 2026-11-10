@@ -5,7 +5,7 @@ import json
 import pytest
 
 from sheridan.diffract.enums import ChangeKind, CommitType
-from sheridan.diffract.models import ApiDiff, DiffractResult, NameChange
+from sheridan.diffract.models import ApiDiff, DiffractResult, NameChange, SignatureChange
 
 
 class TestNameChange:
@@ -120,6 +120,17 @@ class TestDiffractResult:
         assert len(removed) == 1
         assert removed[0] == {"module": "mypackage.mod", "name": "OldClass"}
 
+    def test_to_dict_diff_changed_structure(self) -> None:
+        """diff.changed in to_dict must be a list of {module, name, detail, breaking} dicts."""
+        change = SignatureChange(module="pkg", name="f", detail="*args was removed", is_breaking=True)
+        diff = ApiDiff(added=(), removed=(), changed=(change,))
+
+        diff_dict = self._make_result(diff).to_dict()["diff"]
+
+        assert diff_dict["changed"] == [  # type: ignore[index]
+            {"module": "pkg", "name": "f", "detail": "*args was removed", "breaking": True}
+        ]
+
     def test_to_dict_is_json_serialisable(self, mixed_diff: ApiDiff) -> None:
         """json.dumps and json.loads must convert the to_dict output without an error."""
         result = DiffractResult(
@@ -138,3 +149,25 @@ class TestDiffractResult:
         result = self._make_result(empty_diff)
         with pytest.raises(AttributeError):
             result.summary = "changed"  # type: ignore[misc]
+
+
+class TestApiDiffChanges:
+    """Tests for the effect of the signature changes on the ApiDiff properties."""
+
+    def test_breaking_and_additive_changes_are_split(self) -> None:
+        breaking = SignatureChange(module="m", name="f", detail="d", is_breaking=True)
+        additive = SignatureChange(module="m", name="g", detail="d", is_breaking=False)
+        diff = ApiDiff(added=(), removed=(), changed=(breaking, additive))
+
+        assert diff.breaking_changes == (breaking,)
+        assert diff.additive_changes == (additive,)
+        assert diff.is_breaking
+        assert diff.has_additions
+        assert not diff.is_empty
+
+    def test_additive_change_alone_is_not_breaking(self) -> None:
+        additive = SignatureChange(module="m", name="g", detail="d", is_breaking=False)
+        diff = ApiDiff(added=(), removed=(), changed=(additive,))
+
+        assert not diff.is_breaking
+        assert diff.has_additions

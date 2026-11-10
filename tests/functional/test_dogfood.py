@@ -48,7 +48,11 @@ def test_diffract_on_itself(tmp_path: Path) -> None:
     assert proc.returncode == 1, proc.stderr
     data = json.loads(proc.stdout)
     assert data["group"] == "feat!"
-    assert data["diff"] == {"added": [], "removed": [{"module": "sheridan.diffract", "name": "load_config"}]}
+    assert data["diff"] == {
+        "added": [],
+        "removed": [{"module": "sheridan.diffract", "name": "load_config"}],
+        "changed": [],
+    }
 
     clone.write(INIT, original)
     clone.commit("feat: restore load_config")

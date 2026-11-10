@@ -2,8 +2,10 @@
 
 import pytest
 
+from sheridan.diffract.differ import ApiSurface
 from sheridan.diffract.enums import ChangeKind
 from sheridan.diffract.models import ApiDiff, NameChange
+from sheridan.iceberg import Assignment, Module
 
 
 @pytest.fixture()
@@ -37,3 +39,23 @@ def mixed_diff() -> ApiDiff:
         added=(NameChange(module="mypackage.mod", name="NewClass", kind=ChangeKind.added),),
         removed=(NameChange(module="mypackage.mod", name="OldClass", kind=ChangeKind.removed),),
     )
+
+
+def surface(names: dict[str, list[str]]) -> ApiSurface:
+    """Build an API in which each public name is a plain assignment.
+
+    Args:
+        names: A dict from each module name to its public names.
+
+    Returns:
+        A dict from each module name to an iceberg ``Module``.
+    """
+    return {
+        module: Module(
+            name=module,
+            assignments=tuple(Assignment(name=name, annotation=None) for name in module_names),
+            classes=(),
+            functions=(),
+        )
+        for module, module_names in names.items()
+    }
