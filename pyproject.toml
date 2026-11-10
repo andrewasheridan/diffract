@@ -42,7 +42,7 @@ dev = [
     "ruff>=0.15.7",
     "pyrefly>=1.4.1",
     "commitizen>=4.13.9",
-    "pre-commit>=4.5.1",
+    "prek>=0.5.10",
     "bandit[toml]>=1.9.4",
     "zensical",
     "mkdocstrings[python]>=1.0.3",
@@ -131,7 +131,6 @@ name = "cz_conventional_commits"
 version = "1.0.1"
 version_files = [
     "pyproject.toml:^version",
-    ".pre-commit-config.yaml:rev: v.*# diffract",
 ]
 tag_format = "v$version"
 pre_bump_hooks = ["uv lock", "git add uv.lock"]

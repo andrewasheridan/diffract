@@ -78,7 +78,7 @@ from sheridan.iceberg import get_public_api
 ## Dependencies
 
 - **Runtime**: `sheridan-iceberg`, `gitpython`
-- **Dev**: `ruff`, `pyrefly`, `pytest`, `pytest-cov`, `pytest-mock`, `commitizen`, `pre-commit`, `bandit`, `zensical`, `mkdocstrings`
+- **Dev**: `ruff`, `pyrefly`, `pytest`, `pytest-cov`, `pytest-mock`, `commitizen`, `prek`, `bandit`, `zensical`, `mkdocstrings`
 
 ### Adding dependencies
 
@@ -134,11 +134,14 @@ When `--validate-msg-file` is used **without** explicit `BASE`/`HEAD` refs (the 
 
 ## pre-commit hooks
 
-One hook is exported from `.pre-commit-hooks.yaml`:
+One hook is exported from `.pre-commit-hooks.yaml` (works with pre-commit and prek):
 
 | Hook id | Stage | Purpose |
 |---|---|---|
 | `diffract-validate` | commit-msg | Fails if the commit message type doesn't match the detected API change |
+
+This repo's own hooks are managed by prek (`uv run prek install`) and run as local hooks through
+`uv run --frozen`, including `diffract --validate-msg-file` on `commit-msg`.
 
 The hook reads `src` from `diffract.toml` or `pyproject.toml` automatically:
 
