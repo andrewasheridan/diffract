@@ -1,9 +1,19 @@
 name: Documentation
+# PRs build the docs in the "docs" gate of ci.yaml, so this workflow only deploys.
+# It deploys on pushes to main that can change the site. pyproject.toml covers version
+# bumps, so each release redeploys.
 on:
   push:
     branches:
-      - master
       - main
+    paths:
+      - "docs/**"
+      - "src/**"
+      - "README.md"
+      - "zensical.toml"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/docs.yaml"
 concurrency:
   group: "pages"
   cancel-in-progress: false
@@ -25,9 +35,9 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
           python-version: 3.14
-      - run: pip install zensical "mkdocstrings[python]"
-      - run: cp README.md docs/index.md
-      - run: zensical build --clean
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+      - run: uv sync --locked
+      - run: uv run zensical build --clean
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9  # v5.0.0
         with:
           path: site
