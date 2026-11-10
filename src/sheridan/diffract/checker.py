@@ -91,7 +91,7 @@ def check(
     )
 
     diff = diff_surfaces(base_surface, head_surface)
-    py_changed = has_python_changes(repo, base_ref, head_ref)
+    py_changed = has_python_changes(repo, base_ref, head_ref, src_path=src_path)
     commit_type, summary = classify(diff, py_changed)
 
     return DiffractResult(
@@ -143,7 +143,7 @@ def check_staged(
     )
 
     diff = diff_surfaces(base_surface, head_surface)
-    py_changed = has_python_changes_index(repo)
+    py_changed = has_python_changes_index(repo, src_path=src_path)
     commit_type, summary = classify(diff, py_changed)
 
     return DiffractResult(

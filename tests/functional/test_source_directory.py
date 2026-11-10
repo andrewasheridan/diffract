@@ -43,3 +43,15 @@ def test_src_dot_reads_the_repository_root(repo: GitRepo) -> None:
     assert proc.returncode == 0, proc.stderr
     data = json.loads(proc.stdout)
     assert data["diff"]["added"] == [{"module": "flat", "name": "one"}]
+
+
+def test_python_change_outside_src_is_not_a_refactor(repo: GitRepo) -> None:
+    """A ``.py`` change only in ``tests/`` or ``scripts/`` is not a change to the package code."""
+    repo.write("tests/test_pkg.py", "def test_alpha() -> None: ...\n")
+    repo.write("scripts/tool.py", "print(1)\n")
+    repo.commit("test: add tests")
+
+    proc = repo.diffract("--json")
+
+    assert proc.returncode == 0, proc.stderr
+    assert json.loads(proc.stdout)["commit_type"] == "fix"

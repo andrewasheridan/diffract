@@ -105,6 +105,22 @@ class TestCheckStaged:
         assert result.base_ref == "HEAD"
         assert result.head_ref == ":staged"
 
+    def test_passes_src_path_to_has_python_changes_index(
+        self,
+        empty_diff: ApiDiff,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        mocker.patch("sheridan.diffract.checker.get_repo")
+        mocker.patch("sheridan.diffract.checker.get_api_at_ref", return_value={})
+        mocker.patch("sheridan.diffract.checker.get_api_at_index", return_value={})
+        mock_changes = mocker.patch("sheridan.diffract.checker.has_python_changes_index", return_value=False)
+        mocker.patch("sheridan.diffract.checker.diff_surfaces", return_value=empty_diff)
+        mocker.patch("sheridan.diffract.checker.classify", return_value=(CommitType.fix, "ok"))
+
+        check_staged(repo_path=Path("/tmp"), src_path="lib")
+
+        mock_changes.assert_called_once_with(mocker.ANY, src_path="lib")
+
     def test_uses_head_as_base_ref(
         self,
         empty_diff: ApiDiff,

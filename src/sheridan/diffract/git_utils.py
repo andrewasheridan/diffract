@@ -11,7 +11,7 @@ __all__ = [
 import tarfile
 import tempfile
 from collections.abc import Iterator
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from git import BadName, InvalidGitRepositoryError, Repo
 
@@ -75,6 +75,24 @@ def _read_api(api_root: Path) -> dict[str, list[str]]:
     return surface
 
 
+def _is_python_in(path: str, src_path: str) -> bool:
+    """Find if ``path`` is a ``.py`` file under ``src_path``.
+
+    Args:
+        path: A path relative to the repository root, as git shows it.
+        src_path: The source directory relative to the repository root. ``"."`` is the root.
+
+    Returns:
+        ``True`` if ``path`` ends with ``.py`` and is in ``src_path``, ``False`` otherwise.
+    """
+    if not path.endswith(".py"):
+        return False
+
+    src_parts = PurePosixPath(src_path).parts
+    path_parts = PurePosixPath(path).parts
+    return path_parts[: len(src_parts)] == src_parts
+
+
 def get_repo(path: Path) -> Repo:
     """Find and return the git Repo at or above path.
 
@@ -136,26 +154,32 @@ def get_api_at_ref(repo: Repo, ref: str, src_path: str = "src") -> dict[str, lis
             raise SurfaceError(f"Failed to extract public API at ref {ref!r}: {exc}") from exc
 
 
-def has_python_changes(repo: Repo, base_ref: str, head_ref: str) -> bool:
-    """Check if any ``.py`` files differ between base_ref and head_ref.
+def has_python_changes(repo: Repo, base_ref: str, head_ref: str, src_path: str = "src") -> bool:
+    """Check if any ``.py`` files under ``src_path`` differ between base_ref and head_ref.
+
+    A ``.py`` file outside ``src_path`` (for example in ``tests/``) is not package code,
+    thus it does not count. A renamed file counts if its old path or its new path is in
+    ``src_path``.
 
     Args:
         repo: The git repository to inspect.
         base_ref: The earlier git ref.
         head_ref: The later git ref.
+        src_path: Relative path within the repo that contains Python packages.
 
     Returns:
-        ``True`` if at least one ``.py`` file appears in the diff,
+        ``True`` if at least one ``.py`` file under ``src_path`` appears in the diff,
         ``False`` otherwise.
     """
     base_commit = repo.commit(base_ref)
     head_commit = repo.commit(head_ref)
-    diffs = base_commit.diff(head_commit)
-    for d in diffs:
+
+    for d in base_commit.diff(head_commit):
         a_path: str = d.a_path or ""
         b_path: str = d.b_path or ""
-        if a_path.endswith(".py") or b_path.endswith(".py"):
+        if _is_python_in(a_path, src_path) or _is_python_in(b_path, src_path):
             return True
+
     return False
 
 
@@ -203,24 +227,27 @@ def get_api_at_index(repo: Repo, src_path: str = "src") -> dict[str, list[str]] 
             raise SurfaceError(f"Failed to extract public API from index: {exc}") from exc
 
 
-def has_python_changes_index(repo: Repo) -> bool:
-    """Check if any ``.py`` files differ between HEAD and the staging area.
+def has_python_changes_index(repo: Repo, src_path: str = "src") -> bool:
+    """Check if any ``.py`` files under ``src_path`` differ between HEAD and the staging area.
 
     Compares the current HEAD commit against the git index (staging area) with
     ``git diff --cached``, which obeys ``GIT_INDEX_FILE`` (see ``get_api_at_index``).
-    If the repository has no HEAD commit (initial commit edge case), returns
-    ``True`` to conservatively assume changes exist.
+    A ``.py`` file outside ``src_path`` does not count. If the repository has no HEAD
+    commit (initial commit edge case), returns ``True`` to conservatively assume changes
+    exist.
 
     Args:
         repo: The git repository to inspect.
+        src_path: Relative path within the repo that contains Python packages.
 
     Returns:
-        ``True`` if at least one ``.py`` file appears in the diff between HEAD
-        and the index, or if no HEAD commit exists. ``False`` otherwise.
+        ``True`` if at least one ``.py`` file under ``src_path`` appears in the diff
+        between HEAD and the index, or if no HEAD commit exists. ``False`` otherwise.
     """
     if not repo.head.is_valid():
         return True
 
-    # Without --no-renames, a renamed file shows only its new path.
+    # With --no-renames, git shows a renamed file as a deletion of the old path and an
+    # addition of the new path. Thus the file counts if one of the two is in src_path.
     output: str = repo.git.diff("--cached", "--name-only", "--no-renames", "HEAD")
-    return any(path.endswith(".py") for path in output.splitlines())
+    return any(_is_python_in(path, src_path) for path in output.splitlines())

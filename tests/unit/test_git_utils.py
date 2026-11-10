@@ -69,13 +69,13 @@ class TestHasPythonChanges:
         return repo
 
     def test_returns_true_when_py_file_changed(self) -> None:
-        """Must return True when a .py file appears in the diff."""
-        repo = self._repo_with_diff([self._diff_item("module.py", "module.py")])
+        """Must return True when a .py file under src appears in the diff."""
+        repo = self._repo_with_diff([self._diff_item("src/pkg/module.py", "src/pkg/module.py")])
         assert has_python_changes(repo, "HEAD~1", "HEAD") is True
 
     def test_returns_false_when_only_non_py_files_changed(self) -> None:
         """Must return False when only non-.py files appear in the diff."""
-        repo = self._repo_with_diff([self._diff_item("README.md", "README.md")])
+        repo = self._repo_with_diff([self._diff_item("src/pkg/data.json", "src/pkg/data.json")])
         assert has_python_changes(repo, "HEAD~1", "HEAD") is False
 
     def test_returns_false_when_diff_is_empty(self) -> None:
@@ -85,8 +85,46 @@ class TestHasPythonChanges:
 
     def test_detects_py_change_via_b_path(self) -> None:
         """Must return True when b_path is a .py file (e.g. newly created file)."""
-        repo = self._repo_with_diff([self._diff_item("", "new_module.py")])
+        repo = self._repo_with_diff([self._diff_item("", "src/pkg/new_module.py")])
         assert has_python_changes(repo, "HEAD~1", "HEAD") is True
+
+    @pytest.mark.parametrize(
+        "path", ["tests/test_mod.py", "scripts/tool.py", "docs/conf.py", "setup.py", "srcx/mod.py"]
+    )
+    def test_ignores_py_files_outside_src(self, path: str) -> None:
+        """A .py file outside the source directory is not package code."""
+        repo = self._repo_with_diff([self._diff_item(path, path)])
+        assert has_python_changes(repo, "HEAD~1", "HEAD") is False
+
+    @pytest.mark.parametrize(
+        ("a_path", "b_path"),
+        [("src/pkg/old.py", "tests/old.py"), ("tests/new.py", "src/pkg/new.py")],
+        ids=["moved-out-of-src", "moved-into-src"],
+    )
+    def test_rename_counts_if_one_path_is_in_src(self, a_path: str, b_path: str) -> None:
+        repo = self._repo_with_diff([self._diff_item(a_path, b_path)])
+        assert has_python_changes(repo, "HEAD~1", "HEAD") is True
+
+    def test_rename_outside_src_does_not_count(self) -> None:
+        repo = self._repo_with_diff([self._diff_item("tests/old.py", "scripts/new.py")])
+        assert has_python_changes(repo, "HEAD~1", "HEAD") is False
+
+    @pytest.mark.parametrize(
+        ("src_path", "path", "expected"),
+        [
+            ("lib", "lib/pkg/mod.py", True),
+            ("lib/", "lib/pkg/mod.py", True),
+            ("./lib", "lib/pkg/mod.py", True),
+            ("lib", "src/pkg/mod.py", False),
+            ("python/src", "python/src/pkg/mod.py", True),
+            ("python/src", "python/tests/mod.py", False),
+            (".", "tests/test_mod.py", True),
+            (".", "flat.py", True),
+        ],
+    )
+    def test_uses_the_given_src_path(self, src_path: str, path: str, expected: bool) -> None:
+        repo = self._repo_with_diff([self._diff_item(path, path)])
+        assert has_python_changes(repo, "HEAD~1", "HEAD", src_path=src_path) is expected
 
 
 class TestGetApiAtRef:
@@ -290,13 +328,25 @@ class TestHasPythonChangesIndex:
         return repo
 
     def test_returns_true_when_py_file_in_index_diff(self) -> None:
-        assert has_python_changes_index(self._repo("README.md\nmodule.py")) is True
+        assert has_python_changes_index(self._repo("README.md\nsrc/pkg/module.py")) is True
 
     def test_returns_false_when_only_non_py_files_in_index_diff(self) -> None:
         assert has_python_changes_index(self._repo("README.md")) is False
 
     def test_returns_false_when_index_diff_is_empty(self) -> None:
         assert has_python_changes_index(self._repo("")) is False
+
+    def test_ignores_py_files_outside_src(self) -> None:
+        assert has_python_changes_index(self._repo("tests/test_mod.py\nscripts/tool.py\nsetup.py")) is False
+
+    def test_uses_the_given_src_path(self) -> None:
+        repo = self._repo("src/pkg/mod.py\nlib/pkg/mod.py")
+        assert has_python_changes_index(repo, src_path="lib") is True
+        assert has_python_changes_index(self._repo("src/pkg/mod.py"), src_path="lib") is False
+
+    def test_rename_counts_if_one_path_is_in_src(self) -> None:
+        """With --no-renames, git lists the old path and the new path of a renamed file."""
+        assert has_python_changes_index(self._repo("src/pkg/old.py\ntests/old.py")) is True
 
     def test_returns_true_on_initial_commit(self) -> None:
         repo = self._repo("")
@@ -343,7 +393,8 @@ class TestStagingAreaInARealRepository:
         monkeypatch.setenv("GIT_INDEX_FILE", str(temporary_index))
         repo.git.add("mod.py")
 
-        assert has_python_changes_index(repo) is True
+        assert has_python_changes_index(repo, src_path=".") is True
+        assert has_python_changes_index(repo) is False
         assert get_api_at_index(repo, src_path=".") == {"mod": ["alpha"]}
         assert index.read_bytes() == staged
 
