@@ -6,15 +6,17 @@ from pathlib import Path
 
 from sheridan.diffract.classifier import classify
 from sheridan.diffract.differ import diff_surfaces
+from sheridan.diffract.enums import CommitType
 from sheridan.diffract.exceptions import SurfaceError
 from sheridan.diffract.git_utils import (
     get_api_at_index,
     get_api_at_ref,
+    get_changed_paths,
+    get_changed_paths_index,
     get_repo,
     has_python_changes,
-    has_python_changes_index,
 )
-from sheridan.diffract.models import DiffractResult
+from sheridan.diffract.models import ApiDiff, DiffractResult
 
 type _Surface = dict[str, list[str]]
 
@@ -55,13 +57,40 @@ def _resolve_surfaces(
     return base or {}, head or {}
 
 
+def _classify_changes(
+    diff: ApiDiff,
+    changed_paths: list[str],
+    src_path: str,
+    tests_path: str,
+) -> tuple[CommitType, str]:
+    """Find the code and test changes in the changed paths, then classify the diff.
+
+    A file in ``tests_path`` is a test file, also when ``tests_path`` is in ``src_path``.
+
+    Args:
+        diff: The API diff.
+        changed_paths: The paths of the changed files, relative to the repository root.
+        src_path: The source directory.
+        tests_path: The test directory.
+
+    Returns:
+        The group of possible commit types and the summary.
+    """
+    return classify(
+        diff,
+        code_changed=has_python_changes(changed_paths, src_path, exclude=tests_path),
+        tests_changed=has_python_changes(changed_paths, tests_path),
+    )
+
+
 def check(
     base_ref: str = "HEAD~1",
     head_ref: str = "HEAD",
     repo_path: Path | None = None,
     src_path: str = "src",
+    tests_path: str = "tests",
 ) -> DiffractResult:
-    """Find the public API changes between two git refs and give the commit type.
+    """Find the public API changes between two git refs and give the possible commit types.
 
     Args:
         base_ref: The earlier git ref. The default is ``HEAD~1``.
@@ -69,10 +98,11 @@ def check(
         repo_path: The path of the git repository, or of a directory in it. The
             default is the current working directory.
         src_path: The directory in the repository that contains the Python packages.
+        tests_path: The directory in the repository that contains the tests.
 
     Returns:
-        A :class:`~sheridan.diffract.models.DiffractResult` with the commit type, a
-        summary and the full API diff.
+        A :class:`~sheridan.diffract.models.DiffractResult` with the group of possible
+        commit types, a summary and the full API diff.
 
     Raises:
         GitError: If diffract cannot find the repository, or if a ref is not correct.
@@ -91,8 +121,8 @@ def check(
     )
 
     diff = diff_surfaces(base_surface, head_surface)
-    py_changed = has_python_changes(repo, base_ref, head_ref, src_path=src_path)
-    commit_type, summary = classify(diff, py_changed)
+    changed_paths = get_changed_paths(repo, base_ref, head_ref)
+    commit_type, summary = _classify_changes(diff, changed_paths, src_path, tests_path)
 
     return DiffractResult(
         commit_type=commit_type,
@@ -106,8 +136,9 @@ def check(
 def check_staged(
     repo_path: Path | None = None,
     src_path: str = "src",
+    tests_path: str = "tests",
 ) -> DiffractResult:
-    """Find the public API changes between HEAD and the staging area and give the commit type.
+    """Find the public API changes between HEAD and the staging area and give the possible types.
 
     Use this function in a ``commit-msg`` hook, before git makes the commit. The
     function compares the public API at ``HEAD`` with the public API of the files in
@@ -117,10 +148,11 @@ def check_staged(
         repo_path: The path of the git repository, or of a directory in it. The
             default is the current working directory.
         src_path: The directory in the repository that contains the Python packages.
+        tests_path: The directory in the repository that contains the tests.
 
     Returns:
-        A :class:`~sheridan.diffract.models.DiffractResult` with the commit type, a
-        summary and the full API diff. ``base_ref`` is ``"HEAD"`` and ``head_ref``
+        A :class:`~sheridan.diffract.models.DiffractResult` with the group of possible
+        commit types, a summary and the full API diff. ``base_ref`` is ``"HEAD"`` and ``head_ref``
         is ``":staged"``.
 
     Raises:
@@ -142,8 +174,8 @@ def check_staged(
     )
 
     diff = diff_surfaces(base_surface, head_surface)
-    py_changed = has_python_changes_index(repo, src_path=src_path)
-    commit_type, summary = classify(diff, py_changed)
+    changed_paths = get_changed_paths_index(repo)
+    commit_type, summary = _classify_changes(diff, changed_paths, src_path, tests_path)
 
     return DiffractResult(
         commit_type=commit_type,

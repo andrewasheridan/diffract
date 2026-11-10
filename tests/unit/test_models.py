@@ -93,12 +93,17 @@ class TestDiffractResult:
     def test_to_dict_has_expected_keys(self, addition_diff: ApiDiff) -> None:
         """to_dict must have the five top-level keys."""
         d = self._make_result(addition_diff).to_dict()
-        assert set(d.keys()) == {"commit_type", "summary", "base_ref", "head_ref", "diff"}
+        assert set(d.keys()) == {"group", "possible_types", "summary", "base_ref", "head_ref", "diff"}
 
-    def test_to_dict_commit_type_is_plain_string(self, empty_diff: ApiDiff) -> None:
-        """commit_type in to_dict must be the string value, not the repr of the enum."""
+    def test_to_dict_group_is_plain_string(self, empty_diff: ApiDiff) -> None:
+        """group in to_dict must be the string value, not the repr of the enum."""
         result = self._make_result(empty_diff, CommitType.feat_breaking)
-        assert result.to_dict()["commit_type"] == "feat!"
+        assert result.to_dict()["group"] == "feat!"
+
+    def test_to_dict_gives_possible_types(self, empty_diff: ApiDiff) -> None:
+        """possible_types in to_dict must be a list of the types in the group."""
+        result = self._make_result(empty_diff, CommitType.code)
+        assert result.to_dict()["possible_types"] == ["fix", "refactor", "perf", "style"]
 
     def test_to_dict_diff_added_structure(self, addition_diff: ApiDiff) -> None:
         """diff.added in to_dict must be a list of {module, name} dicts."""
@@ -125,7 +130,7 @@ class TestDiffractResult:
             head_ref="v2.0",
         )
         parsed = json.loads(json.dumps(result.to_dict()))
-        assert parsed["commit_type"] == "feat!"
+        assert parsed["group"] == "feat!"
         assert parsed["base_ref"] == "v1.0"
 
     def test_is_frozen(self, empty_diff: ApiDiff) -> None:

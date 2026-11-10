@@ -117,3 +117,33 @@ class TestLoadConfig:
         config_file.write_text('tool = "x"\n', encoding="utf-8")
         with pytest.raises(DiffractError, match=re.escape(str(config_file))):
             load_config(tmp_path)
+
+
+class TestTestsSetting:
+    """Tests for the ``tests`` setting. It works the same as ``src``."""
+
+    def test_defaults_to_none(self, tmp_path: Path) -> None:
+        assert load_config(tmp_path).tests is None
+
+    def test_reads_tests_from_diffract_toml(self, tmp_path: Path) -> None:
+        (tmp_path / "diffract.toml").write_text('src = "src"\ntests = "src/pkg/tests"\n', encoding="utf-8")
+        result = load_config(tmp_path)
+        assert result.src == "src"
+        assert result.tests == "src/pkg/tests"
+
+    def test_reads_tests_from_pyproject_toml(self, tmp_path: Path) -> None:
+        (tmp_path / "pyproject.toml").write_text('[tool.diffract]\ntests = "test"\n', encoding="utf-8")
+        result = load_config(tmp_path)
+        assert result.src is None
+        assert result.tests == "test"
+
+    def test_diffract_toml_takes_priority_over_pyproject_toml(self, tmp_path: Path) -> None:
+        (tmp_path / "diffract.toml").write_text('tests = "from-diffract-toml"\n', encoding="utf-8")
+        (tmp_path / "pyproject.toml").write_text('[tool.diffract]\ntests = "from-pyproject"\n', encoding="utf-8")
+        assert load_config(tmp_path).tests == "from-diffract-toml"
+
+    @pytest.mark.parametrize("file_text", ["tests = 3\n", "tests = ['a']\n"])
+    def test_non_string_tests_raises(self, tmp_path: Path, file_text: str) -> None:
+        (tmp_path / "diffract.toml").write_text(file_text, encoding="utf-8")
+        with pytest.raises(DiffractError, match="'tests' must be a string"):
+            load_config(tmp_path)

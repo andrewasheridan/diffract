@@ -30,11 +30,11 @@ diffract
 diffract compares `HEAD~1` with `HEAD`. Then it writes the result:
 
 ```
-Detected: fix
+Detected: other
 
 The public API did not change.
 
-Suggested commit prefix: fix:
+This can be a docs, ci, chore or build commit.
 ```
 
 To compare other refs, give the two refs:
@@ -43,20 +43,26 @@ To compare other refs, give the two refs:
 diffract v1.2.0 HEAD
 ```
 
-## How diffract gives the commit type
+## How diffract gives the commit types
 
 diffract uses [sheridan-iceberg](https://github.com/andrewasheridan/iceberg) to get the public names at each ref.
-Then it compares the two sets of names. It gives the type in this order of priority:
+Then it compares the two sets of names and finds the changed files. It gives the group
+of possible types. The first rule that applies gives the result:
 
-| Change | Commit type |
-|---|---|
-| A public name was removed | `feat!` (breaking) |
-| A public name was added | `feat` |
-| Only internal or private changes in the source directory | `refactor` |
-| No change | `fix` |
+| Change | Group | Possible types |
+|---|---|---|
+| A public name was removed | `feat!` | `feat!` (breaking) |
+| A public name was added | `feat` | `feat` |
+| A `.py` or `.pyi` file in the source directory changed, and no public name changed | `code` | `fix`, `refactor`, `perf`, `style` |
+| A `.py` or `.pyi` file in the test directory changed | `test` | `test` |
+| All other changes | `other` | `docs`, `ci`, `chore`, `build` |
 
-diffract counts a code change only in the `.py` and `.pyi` files in the source directory.
-diffract compares names only. It does not find signature changes.
+diffract compares names and file paths only. Thus it cannot tell a fix from a refactor,
+or `docs` from `ci`. It does not find signature changes.
+
+A file in the test directory is a test file, also when the test directory is in the
+source directory. A commit that changes source files and test files is in the `code`
+group.
 
 ## Next steps
 

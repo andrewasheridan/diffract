@@ -23,6 +23,8 @@ _COMMIT_TYPE_RE: re.Pattern[str] = re.compile(r"^(feat|fix|refactor)(\([^)]*\))?
 _BREAKING_FOOTER_RE: re.Pattern[str] = re.compile(r"^BREAKING[ -]CHANGE: ", re.MULTILINE)
 _ISSUES_URL = "https://github.com/andrewasheridan/diffract/issues"
 _ERROR_EXIT_CODE = 3
+# Only for these groups can diffract give one commit prefix.
+_FEATURE_TYPES = (CommitType.feat_breaking, CommitType.feat)
 
 
 @dataclass(frozen=True)
@@ -66,7 +68,7 @@ def _build_parser() -> argparse.ArgumentParser:
     """
     parser = _ArgumentParser(
         prog="diffract",
-        description="Find the public API changes between two git refs and suggest a commit type.",
+        description="Find the public API changes between two git refs and give the possible commit types.",
     )
     parser.add_argument(
         "--version",
@@ -102,6 +104,13 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="SRC",
         dest="src_path",
         help="The directory in the repository that contains the Python packages (default: src).",
+    )
+    parser.add_argument(
+        "--tests",
+        default=None,
+        metavar="TESTS",
+        dest="tests_path",
+        help="The directory in the repository that contains the tests (default: tests).",
     )
     parser.add_argument(
         "--json",
@@ -170,9 +179,26 @@ def _format_human(result: DiffractResult, scope: str | None = None) -> str:
                     lines.append(f"    + {name}")
 
     lines.append("")
-    lines.append(f"Suggested commit prefix: {_format_commit_type(result.commit_type, scope)}")
+    if result.commit_type in _FEATURE_TYPES:
+        lines.append(f"Suggested commit prefix: {_format_commit_type(result.commit_type, scope)}")
+    else:
+        lines.append(f"This can be a {_join_types(result.commit_type.possible_types)} commit.")
 
     return "\n".join(lines)
+
+
+def _join_types(types: tuple[str, ...]) -> str:
+    """Write a list of commit types as text.
+
+    Args:
+        types: The commit types, for example ``("fix", "refactor", "perf")``.
+
+    Returns:
+        The types as text, for example ``"fix, refactor or perf"``.
+    """
+    if len(types) == 1:
+        return types[0]
+    return f"{', '.join(types[:-1])} or {types[-1]}"
 
 
 def _resolve_exit_code(result: DiffractResult, use_exit_code: bool) -> int:
@@ -331,17 +357,19 @@ def _run() -> None:
 
     try:
         config = load_config(repo_root)
-        # The --src flag has priority over the configuration file and the default.
+        # The flags have priority over the configuration file and the defaults.
         src_path: str = args.src_path or config.src or "src"
+        tests_path: str = args.tests_path or config.tests or "tests"
 
         if args.validate_msg_file is not None and not args.base_ref and not args.head_ref:
-            result = check_staged(repo_path=repo_path, src_path=src_path)
+            result = check_staged(repo_path=repo_path, src_path=src_path, tests_path=tests_path)
         else:
             result = check(
                 base_ref=args.base_ref or "HEAD~1",
                 head_ref=args.head_ref or "HEAD",
                 repo_path=repo_path,
                 src_path=src_path,
+                tests_path=tests_path,
             )
     except DiffractError as exc:
         print(f"Error: {exc}", file=sys.stderr)

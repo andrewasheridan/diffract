@@ -28,12 +28,12 @@ Removed public names:
 Suggested commit prefix: feat!:
 """
 
-FIX_OUTPUT = """\
-Detected: fix
+OTHER_OUTPUT = """\
+Detected: other
 
 The public API did not change.
 
-Suggested commit prefix: fix:
+This can be a docs, ci, chore or build commit.
 """
 
 
@@ -54,7 +54,7 @@ def readme_repo(repo: GitRepo) -> GitRepo:
 def test_the_readme_outputs_are_in_the_readme() -> None:
     """The outputs that these tests expect are the ones that the README shows."""
     assert f"```\n{BREAKING_OUTPUT}```" in README
-    assert f"```\n{FIX_OUTPUT}```" in README
+    assert f"```\n{OTHER_OUTPUT}```" in README
     assert "Suggested commit prefix: feat(parser):" in README
     assert "diffract: commit type mismatch\n  written:  fix(parser):\n  detected: feat(parser):" in README
 
@@ -72,7 +72,7 @@ def test_default_and_explicit_refs(readme_repo: GitRepo) -> None:
     readme_repo.commit("docs: more")
     readme_repo.write("README.md", "# pkg\n\nMore docs.\n")
     readme_repo.commit("docs: even more")
-    assert readme_repo.diffract().stdout == FIX_OUTPUT
+    assert readme_repo.diffract().stdout == OTHER_OUTPUT
     assert readme_repo.diffract("HEAD~3", "HEAD").stdout == BREAKING_OUTPUT
 
 
@@ -90,7 +90,7 @@ def test_src_json_and_exit_code(readme_repo: GitRepo) -> None:
     assert "Added public names:\n  sheridan.diffract:\n    + OldHelper" in proc.stdout
 
     data = json.loads(readme_repo.diffract("--src", "lib/", "--json").stdout)
-    assert data["commit_type"] == "feat"
+    assert data["group"] == "feat"
     assert "- `2`: with `--exit-code`, a change that is not breaking (a public name was added)." in README
 
 
@@ -125,10 +125,13 @@ def test_github_actions_example(readme_repo: GitRepo, tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(
     ("filename", "text"),
-    [("diffract.toml", 'src = "python/src"\n'), ("pyproject.toml", '[tool.diffract]\nsrc = "python/src"\n')],
+    [
+        ("diffract.toml", 'src = "python/src"\ntests = "python/tests"\n'),
+        ("pyproject.toml", '[tool.diffract]\nsrc = "python/src"\ntests = "python/tests"\n'),
+    ],
 )
 def test_configuration_files(readme_repo: GitRepo, filename: str, text: str) -> None:
-    """The README configuration examples set the source directory."""
+    """The README configuration examples set the source directory and the test directory."""
     assert f"```toml\n{text}```" in README
     (readme_repo.path / "python").mkdir()
     readme_repo.git("mv", "src", "python/src")
@@ -140,6 +143,11 @@ def test_configuration_files(readme_repo: GitRepo, filename: str, text: str) -> 
     data = json.loads(readme_repo.diffract("--json").stdout)
 
     assert data["diff"] == {"added": [{"module": "sheridan.diffract", "name": "OldHelper"}], "removed": []}
+
+    readme_repo.write("python/tests/test_helpers.py", "def test_helper() -> None:\n    assert True\n")
+    readme_repo.commit("test: add a test")
+
+    assert json.loads(readme_repo.diffract("--json").stdout)["group"] == "test"
 
 
 def test_python_api(readme_repo: GitRepo, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -155,9 +163,9 @@ def test_python_api(readme_repo: GitRepo, monkeypatch: pytest.MonkeyPatch) -> No
     assert result.summary
     assert [(c.module, c.name) for c in result.diff.removed] == [("sheridan.diffract", "OldHelper")]
     assert result.diff.added == ()
-    assert json.loads(json.dumps(result.to_dict()))["commit_type"] == "feat!"
+    assert json.loads(json.dumps(result.to_dict()))["group"] == "feat!"
 
-    assert str(check_staged().commit_type) == "fix"
+    assert str(check_staged().commit_type) == "other"
     readme_repo.write(PACKAGE, BEFORE)
     readme_repo.git("add", "--all")
     assert str(check_staged().commit_type) == "feat"

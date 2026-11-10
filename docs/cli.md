@@ -3,7 +3,7 @@
 ## Usage
 
 ```
-diffract [BASE_REF] [HEAD_REF] [--src SRC] [--json] [--exit-code] [--validate-msg-file MSGFILE]
+diffract [BASE_REF] [HEAD_REF] [--src SRC] [--tests TESTS] [--json] [--exit-code] [--validate-msg-file MSGFILE]
 ```
 
 You can also run diffract as a module: `python -m sheridan.diffract`. The module accepts
@@ -16,6 +16,7 @@ the same arguments.
 | `BASE_REF` | `HEAD~1` | The earlier git ref to compare. |
 | `HEAD_REF` | `HEAD` | The later git ref to compare. If you give only `BASE_REF`, diffract uses `HEAD`. |
 | `--src SRC` | `src` | The directory in the repository that contains the Python packages. Read [Configuration](configuration.md). |
+| `--tests TESTS` | `tests` | The directory in the repository that contains the tests. Read [Configuration](configuration.md). |
 | `--json` | off | Write JSON to stdout, not text. Read [JSON output](json-output.md). |
 | `--exit-code` | off | Give an exit code for the type of API change. |
 | `--validate-msg-file MSGFILE` | none | Check the commit type in a commit message file. Read [commit-msg hook](commit-msg-hook.md). |
@@ -35,6 +36,9 @@ diffract HEAD~3 HEAD
 
 # Use a different source directory
 diffract --src lib/
+
+# Use a different test directory
+diffract --tests src/pkg/tests
 
 # Write JSON for CI
 diffract --json
@@ -57,15 +61,16 @@ Removed public names:
 Suggested commit prefix: feat!:
 ```
 
-For added names, diffract writes the names with a `+`. If no public name changed,
-diffract writes this:
+For added names, diffract writes the names with a `+`. diffract shows a suggested prefix
+only for `feat!` and `feat`. For the other groups, it shows the possible types. For
+example, if no public name changed and no Python file changed, diffract writes this:
 
 ```
-Detected: fix
+Detected: other
 
 The public API did not change.
 
-Suggested commit prefix: fix:
+This can be a docs, ci, chore or build commit.
 ```
 
 ## Exit codes

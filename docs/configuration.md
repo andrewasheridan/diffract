@@ -1,17 +1,26 @@
 # Configuration
 
-diffract has one setting: `src`. It is the directory in the repository that contains the
-Python packages. The default is `src`.
+diffract has two settings:
 
-## Write the setting in a file
+| Setting | Flag | Default | Description |
+|---|---|---|---|
+| `src` | `--src` | `src` | The directory in the repository that contains the Python packages. |
+| `tests` | `--tests` | `tests` | The directory in the repository that contains the tests. |
 
-Write the source directory one time in a configuration file. Then you do not have to
-give `--src` in each command.
+The two paths are relative to the repository root. The test directory can be next to the
+source directory (`tests`) or in it (for example `src/pkg/tests`). A Python file in the
+test directory is a test file, not a source file.
+
+## Write the settings in a file
+
+Write the settings one time in a configuration file. Then you do not have to give
+`--src` and `--tests` in each command.
 
 **`diffract.toml`**:
 
 ```toml
 src = "python/src"
+tests = "python/tests"
 ```
 
 **`pyproject.toml`**:
@@ -19,6 +28,7 @@ src = "python/src"
 ```toml
 [tool.diffract]
 src = "python/src"
+tests = "python/tests"
 ```
 
 diffract reads the files in the root of the git repository. Thus it finds them also
@@ -26,10 +36,12 @@ when you start diffract in a subdirectory.
 
 ## Order of priority
 
-1. The `--src` flag.
+diffract uses this order of priority for each setting:
+
+1. The flag (`--src` or `--tests`).
 2. `diffract.toml`.
 3. `pyproject.toml`.
-4. The default (`src`).
+4. The default (`src` or `tests`).
 
 ## When the source directory does not exist
 
@@ -42,5 +54,5 @@ replacement.
 
 ## Errors
 
-If a configuration file is not correct TOML, or if `src` is not a string, diffract shows
-an error and exits with code 3.
+If a configuration file is not correct TOML, or if `src` or `tests` is not a string,
+diffract shows an error and exits with code 3.

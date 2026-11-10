@@ -40,14 +40,14 @@ def test_diffract_on_itself(tmp_path: Path) -> None:
 
     proc = clone.diffract("HEAD", "HEAD", "--json")
     assert proc.returncode == 0, proc.stderr
-    assert json.loads(proc.stdout)["commit_type"] == "fix"
+    assert json.loads(proc.stdout)["group"] == "other"
 
     clone.write(INIT, original.replace('    "load_config",\n', ""))
     clone.commit("feat!: remove load_config")
     proc = clone.diffract("--json", "--exit-code")
     assert proc.returncode == 1, proc.stderr
     data = json.loads(proc.stdout)
-    assert data["commit_type"] == "feat!"
+    assert data["group"] == "feat!"
     assert data["diff"] == {"added": [], "removed": [{"module": "sheridan.diffract", "name": "load_config"}]}
 
     clone.write(INIT, original)

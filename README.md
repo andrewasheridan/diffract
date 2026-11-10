@@ -1,6 +1,6 @@
 # sheridan-diffract
 
-**diffract finds how the public API of a Python package changed between two git commits. It gives the Conventional Commit type for that change.**
+**diffract finds how the public API of a Python package changed between two git commits. It gives the Conventional Commit types that are possible for that change.**
 
 Most semver tools accept the commit type that the developer writes. `diffract` compares that type with the real change to the API. For example, it finds a commit with the type `fix:` that removed a public function.
 
@@ -10,18 +10,23 @@ diffract supports only Python 3.14 and later.
 
 1. diffract uses [sheridan-iceberg](https://github.com/andrewasheridan/iceberg) to get the public API at two points in the git history.
 2. It compares the two APIs to find the names that were added or removed.
-3. It gives a Conventional Commit type for the change:
+3. It gives the group of Conventional Commit types that are possible for the change. The first rule that applies gives the result:
 
-| Change | Commit type |
-|---|---|
-| A public name was removed | `feat!` (breaking) |
-| A public name was added | `feat` |
-| Only internal or private changes in the source directory | `refactor` |
-| No change | `fix` |
+| Change | Group | Possible types |
+|---|---|---|
+| A public name was removed | `feat!` | `feat!` (breaking) |
+| A public name was added | `feat` | `feat` |
+| A `.py` or `.pyi` file in the source directory changed, and no public name changed | `code` | `fix`, `refactor`, `perf`, `style` |
+| A `.py` or `.pyi` file in the test directory changed | `test` | `test` |
+| All other changes | `other` | `docs`, `ci`, `chore`, `build` |
 
-diffract counts a code change only in the `.py` and `.pyi` files in the source directory
-(`src` by default). A change only to a `.py` or `.pyi` file in `tests/`, `scripts/` or
-`docs/` gives `fix`, not `refactor`.
+diffract compares only names and file paths. Thus it cannot tell a fix from a refactor,
+or `docs` from `ci`. It tells you only which types are possible.
+
+The source directory is `src` and the test directory is `tests` by default. A file in the
+test directory is a test file, also when the test directory is in the source directory
+(for example `src/pkg/tests`). A commit that changes source files and test files is in
+the `code` group.
 
 ## Installation
 
@@ -42,6 +47,9 @@ diffract HEAD~3 HEAD
 
 # Use a different source directory (default: src/)
 diffract --src lib/
+
+# Use a different test directory (default: tests/)
+diffract --tests src/pkg/tests
 
 # Write JSON for CI
 diffract --json
@@ -72,12 +80,15 @@ Suggested commit prefix: feat!:
 ```
 
 ```
-Detected: fix
+Detected: other
 
 The public API did not change.
 
-Suggested commit prefix: fix:
+This can be a docs, ci, chore or build commit.
 ```
+
+diffract shows a suggested prefix only for `feat!` and `feat`. For the other groups, it
+shows the possible types.
 
 ### Python API
 
@@ -85,7 +96,8 @@ Suggested commit prefix: fix:
 from sheridan.diffract import check
 
 result = check(base_ref="v1.2.0", head_ref="HEAD")
-print(result.commit_type)   # for example "feat!"
+print(result.commit_type)   # the group, for example "feat!" or "code"
+print(result.commit_type.possible_types)  # for example ("fix", "refactor", "perf", "style")
 print(result.summary)       # a description for people
 print(result.diff.removed)  # a tuple of NameChange objects
 print(result.diff.added)
@@ -101,7 +113,7 @@ print(json.dumps(result.to_dict(), indent=2))
 from sheridan.diffract import check_staged
 
 result = check_staged()
-print(result.commit_type)  # the type of the staged change, not of the last commit
+print(result.commit_type)  # the group of the staged change, not of the last commit
 ```
 
 ### Validate commit messages with pre-commit or prek
@@ -111,7 +123,7 @@ print(result.commit_type)  # the type of the staged change, not of the last comm
 - If the commit removes a public name, the message must have a `!` (for example `feat!:` or `fix!:`) or a `BREAKING CHANGE:` footer.
 - If the commit adds a public name, the type must be `feat`, or the message must have a `!`.
 
-The detected type is only an estimate from the public names. Thus the hook accepts a message that tells more than the detected type. For example, it accepts `fix:` for a change to a function body. It also accepts `feat!:` for a breaking change in behavior.
+The detected group is only an estimate from the public names. Thus the hook accepts a message that tells more than the detected group. For example, it accepts `fix:` for a change to a function body. It also accepts `feat!:` for a breaking change in behavior.
 
 ```yaml
 # .pre-commit-config.yaml
@@ -144,12 +156,18 @@ The hook checks only the `feat`, `fix` and `refactor` types. It never blocks oth
 
 ### Configuration
 
-If your source code is not in `src/`, write the source directory one time in a configuration file. Then you do not have to give `--src` in each command.
+diffract has two settings:
+
+- `src`: the source directory. The default is `src`.
+- `tests`: the test directory. The default is `tests`.
+
+If your code is in other directories, write the settings one time in a configuration file. Then you do not have to give `--src` and `--tests` in each command.
 
 **`diffract.toml`** (has priority over `pyproject.toml`):
 
 ```toml
 src = "python/src"
+tests = "python/tests"
 ```
 
 **`pyproject.toml`**:
@@ -157,14 +175,15 @@ src = "python/src"
 ```toml
 [tool.diffract]
 src = "python/src"
+tests = "python/tests"
 ```
 
-The order of priority is:
+The order of priority for each setting is:
 
-1. The `--src` flag.
+1. The flag (`--src` or `--tests`).
 2. `diffract.toml`.
 3. `pyproject.toml`.
-4. The default (`src/`).
+4. The default (`src/` or `tests/`).
 
 diffract reads only the source directory. It does not read the repository root as a replacement:
 

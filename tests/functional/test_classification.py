@@ -8,6 +8,7 @@ from tests.functional.conftest import INITIAL_PACKAGE, GitRepo
 
 ADDED = INITIAL_PACKAGE.replace('"beta"]', '"beta", "gamma"]') + "\n\ndef gamma() -> int:\n    return 3\n"
 REMOVED = '__all__ = ["alpha"]\n\n\ndef alpha() -> int:\n    return 1\n'
+TEST = "def test_alpha() -> None:\n    assert True\n"
 INTERNAL = INITIAL_PACKAGE.replace("return 2", "return 2 + _offset()") + "\n\ndef _offset() -> int:\n    return 0\n"
 
 
@@ -20,29 +21,31 @@ def _json(repo: GitRepo, *args: str) -> dict[str, object]:
 
 
 @pytest.mark.parametrize(
-    ("files", "commit_type", "added", "removed"),
+    ("files", "group", "added", "removed"),
     [
         pytest.param({"src/pkg/__init__.py": ADDED}, "feat", [{"module": "pkg", "name": "gamma"}], [], id="addition"),
         pytest.param({"src/pkg/__init__.py": REMOVED}, "feat!", [], [{"module": "pkg", "name": "beta"}], id="removal"),
-        pytest.param({"src/pkg/__init__.py": INTERNAL}, "refactor", [], [], id="internal-change"),
-        pytest.param({"README.md": "# pkg\n\nMore words.\n"}, "fix", [], [], id="no-python-change"),
+        pytest.param({"src/pkg/__init__.py": INTERNAL}, "code", [], [], id="internal-change"),
+        pytest.param({"src/pkg/__init__.py": INTERNAL, "tests/test_pkg.py": TEST}, "code", [], [], id="code-and-test"),
+        pytest.param({"tests/test_pkg.py": TEST}, "test", [], [], id="test-change"),
+        pytest.param({"README.md": "# pkg\n\nMore words.\n"}, "other", [], [], id="no-python-change"),
     ],
 )
 def test_json_reports_the_classification(
     repo: GitRepo,
     files: dict[str, str],
-    commit_type: str,
+    group: str,
     added: list[dict[str, str]],
     removed: list[dict[str, str]],
 ) -> None:
-    """The default refs (HEAD~1 and HEAD) give the commit type and the changed names."""
+    """The default refs (HEAD~1 and HEAD) give the group of possible types and the changed names."""
     for relative, text in files.items():
         repo.write(relative, text)
     repo.commit("change")
 
     data = _json(repo)
 
-    assert data["commit_type"] == commit_type
+    assert data["group"] == group
     assert data["base_ref"] == "HEAD~1"
     assert data["head_ref"] == "HEAD"
     assert data["diff"] == {"added": added, "removed": removed}
@@ -55,7 +58,7 @@ def test_addition_and_removal_together_is_breaking(repo: GitRepo) -> None:
 
     data = _json(repo)
 
-    assert data["commit_type"] == "feat!"
+    assert data["group"] == "feat!"
     assert data["diff"] == {
         "added": [{"module": "pkg", "name": "delta"}],
         "removed": [{"module": "pkg", "name": "beta"}],
@@ -69,8 +72,8 @@ def test_explicit_refs_span_several_commits(repo: GitRepo) -> None:
     repo.write("README.md", "# pkg\n\nDocs.\n")
     repo.commit("docs")
 
-    assert _json(repo)["commit_type"] == "fix"
-    assert _json(repo, "HEAD~2", "HEAD")["commit_type"] == "feat"
+    assert _json(repo)["group"] == "other"
+    assert _json(repo, "HEAD~2", "HEAD")["group"] == "feat"
 
 
 @pytest.mark.parametrize(
@@ -118,3 +121,30 @@ def test_src_flag_and_config_files(repo: GitRepo) -> None:
     repo.write("diffract.toml", 'src = "lib"\n')
     assert removed() == [{"module": "other", "name": "one"}]
     assert removed("--src", "src") == [{"module": "pkg", "name": "alpha"}, {"module": "pkg", "name": "beta"}]
+
+
+def test_human_output_gives_the_possible_types(repo: GitRepo) -> None:
+    """For a group with more than one type, the text gives the types and no prefix."""
+    repo.write("src/pkg/__init__.py", INTERNAL)
+    repo.commit("change")
+
+    proc = repo.diffract()
+
+    assert proc.returncode == 0, proc.stderr
+    assert "This can be a fix, refactor, perf or style commit." in proc.stdout
+    assert "Suggested commit prefix" not in proc.stdout
+    assert _json(repo)["possible_types"] == ["fix", "refactor", "perf", "style"]
+
+
+def test_tests_flag_and_config_files(repo: GitRepo) -> None:
+    """A test directory in the source directory is set with ``--tests`` or the ``tests`` setting."""
+    repo.write("src/pkg/tests/test_pkg.py", TEST)
+    repo.commit("add tests in the package")
+
+    assert _json(repo)["group"] == "code"
+    assert _json(repo, "--tests", "src/pkg/tests")["group"] == "test"
+
+    repo.write("pyproject.toml", '[tool.diffract]\ntests = "src/pkg/tests"\n')
+    assert _json(repo)["group"] == "test"
+    repo.write("diffract.toml", 'tests = "tests"\n')
+    assert _json(repo)["group"] == "code"
