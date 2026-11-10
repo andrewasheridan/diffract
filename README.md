@@ -48,6 +48,8 @@ diffract --json
 diffract --exit-code
 ```
 
+You can also run diffract as a module: `python -m sheridan.diffract`. It accepts the same arguments.
+
 **Exit codes:**
 - `0` — no API surface changes, or `--exit-code` is not set
 - `1` — breaking change (public name removed) with `--exit-code`, or a commit message that tells less than the API change with `--validate-msg-file`
