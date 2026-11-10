@@ -161,6 +161,33 @@ class TestMain:
         assert exc_info.value.code == 3
         assert "no repo found" in capsys.readouterr().err
 
+    @pytest.mark.parametrize(
+        ("file_name", "content"),
+        [
+            ("diffract.toml", "src = 3\n"),
+            ("pyproject.toml", '[tool]\ndiffract = "x"\n'),
+        ],
+    )
+    def test_invalid_config_exits_three(
+        self,
+        file_name: str,
+        content: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """'diffract' must print an error without a traceback and exit 3 if the config file is not valid."""
+        (tmp_path / file_name).write_text(content, encoding="utf-8")
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(sys, "argv", ["diffract"])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 3
+        err = capsys.readouterr().err
+        assert err.startswith("Error: ")
+        assert file_name in err
+        assert "Traceback" not in err
+
     def test_exit_code_breaking(
         self,
         removal_diff: ApiDiff,

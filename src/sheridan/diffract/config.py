@@ -48,6 +48,29 @@ def _parse_src(data: dict[str, Any], config_file: Path) -> str | None:
     return src
 
 
+def _get_table(data: dict[str, Any], key: str, config_file: Path, prefix: str = "") -> dict[str, Any]:
+    """Get a TOML table from a parsed TOML table.
+
+    Args:
+        data: The parsed TOML table to read from.
+        key: The key of the table to get.
+        config_file: Path to the config file, used in error messages.
+        prefix: The dotted path to ``data`` in the file, used in error messages.
+
+    Returns:
+        The table at ``key``, or an empty dict if ``key`` is not present.
+
+    Raises:
+        DiffractError: If ``key`` is present but is not a table.
+    """
+    table = data.get(key, {})
+    if not isinstance(table, dict):
+        raise DiffractError(
+            f"Invalid diffract config in {config_file}: '{prefix}{key}' must be a table, got {type(table).__name__!r}"
+        )
+    return table
+
+
 def _load_toml(path: Path) -> dict[str, Any]:
     """Read and parse a TOML file, converting parse errors to DiffractError.
 
@@ -81,8 +104,9 @@ def load_config(repo_root: Path) -> DiffractConfig:
         or an empty ``DiffractConfig`` if neither file exists.
 
     Raises:
-        DiffractError: If a config file is found but contains invalid TOML
-            or an ``src`` value that is not a string.
+        DiffractError: If a config file is found but contains invalid TOML,
+            a ``tool`` or ``tool.diffract`` value that is not a table, or an
+            ``src`` value that is not a string.
     """
     diffract_toml = repo_root / "diffract.toml"
     if diffract_toml.is_file():
@@ -92,7 +116,8 @@ def load_config(repo_root: Path) -> DiffractConfig:
     pyproject_toml = repo_root / "pyproject.toml"
     if pyproject_toml.is_file():
         data = _load_toml(pyproject_toml)
-        tool_diffract: dict[str, Any] = data.get("tool", {}).get("diffract", {})
+        tool = _get_table(data, "tool", pyproject_toml)
+        tool_diffract = _get_table(tool, "diffract", pyproject_toml, prefix="tool.")
         return DiffractConfig(src=_parse_src(tool_diffract, pyproject_toml))
 
     return DiffractConfig()
