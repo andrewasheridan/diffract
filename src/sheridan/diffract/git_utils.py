@@ -13,7 +13,7 @@ import tempfile
 from collections.abc import Iterator
 from pathlib import Path, PurePosixPath
 
-from git import BadName, InvalidGitRepositoryError, Repo
+from git import BadName, GitCommandError, InvalidGitRepositoryError, Repo
 
 from sheridan.diffract.exceptions import GitError, SurfaceError
 from sheridan.iceberg import Module, Package, get_public_api
@@ -93,6 +93,48 @@ def _is_python_in(path: str, src_path: str) -> bool:
     return path_parts[: len(src_parts)] == src_parts
 
 
+def _extract_src(repo: Repo, treeish: str, src_path: str, dest: Path) -> Path | None:
+    """Write ``src_path`` of a tree to ``dest`` with ``git archive``.
+
+    The function archives only ``src_path``, not the full repository. Thus a file that
+    tar extraction refuses (for example an absolute symbolic link) has no effect when it
+    is outside ``src_path``, and a large repository is quick to extract.
+
+    Args:
+        repo: The git repository to archive.
+        treeish: A commit ref or a tree SHA.
+        src_path: The source directory relative to the repository root. ``"."`` is the root.
+        dest: An empty directory to write the files to.
+
+    Returns:
+        The path of ``src_path`` in ``dest``. ``None`` if ``src_path`` is not in the tree.
+
+    Raises:
+        GitError: If ``git archive`` fails or tar extraction refuses a file.
+    """
+    src = PurePosixPath(src_path)
+    pathspec: list[str] = []
+    if src.parts:
+        pathspec = ["--", str(src)]
+        # git archive fails for a pathspec that has no match, thus find the directory first.
+        if not repo.git.ls_tree(treeish, *pathspec):
+            return None
+
+    try:
+        proc = repo.git.archive(treeish, *pathspec, format="tar", as_process=True)
+        with tarfile.open(fileobj=proc.stdout, mode="r|") as tar:
+            tar.extractall(dest, filter="data")
+        proc.wait()
+    except (GitCommandError, tarfile.TarError) as exc:
+        raise GitError(f"Cannot extract {src_path!r} at {treeish!r}: {exc}") from exc
+
+    api_root = dest / src
+    if not api_root.is_dir():
+        return None
+
+    return api_root
+
+
 def get_repo(path: Path) -> Repo:
     """Find and return the git Repo at or above path.
 
@@ -114,9 +156,9 @@ def get_repo(path: Path) -> Repo:
 def get_api_at_ref(repo: Repo, ref: str, src_path: str = "src") -> dict[str, list[str]] | None:
     """Extract the public API surface at a given git ref.
 
-    Uses ``git archive`` to extract the repository tree into a temporary
-    directory, then invokes ``sheridan.iceberg.get_public_api()`` on the
-    ``src_path`` subdirectory. To read the repository root, use ``"."``.
+    Uses ``git archive`` to extract only ``src_path`` into a temporary
+    directory, then invokes ``sheridan.iceberg.get_public_api()`` on it.
+    To read the repository root, use ``"."``.
 
     Args:
         repo: The git repository to archive.
@@ -129,7 +171,8 @@ def get_api_at_ref(repo: Repo, ref: str, src_path: str = "src") -> dict[str, lis
         ``src_path`` does not exist at ``ref``.
 
     Raises:
-        GitError: If ``ref`` is not a valid ref in the repository.
+        GitError: If ``ref`` is not a valid ref in the repository, or if
+            ``git archive`` or the tar extraction fails.
         SurfaceError: If ``get_public_api`` raises any exception.
     """
     # Validate the ref early so we can give a clear error message.
@@ -139,13 +182,8 @@ def get_api_at_ref(repo: Repo, ref: str, src_path: str = "src") -> dict[str, lis
         raise GitError(f"Unknown ref: {ref}") from exc
 
     with tempfile.TemporaryDirectory() as tmp:
-        proc = repo.git.archive(ref, format="tar", as_process=True)
-        with tarfile.open(fileobj=proc.stdout, mode="r|") as tar:
-            tar.extractall(tmp, filter="data")
-        proc.wait()
-
-        api_root = Path(tmp) / src_path
-        if not api_root.exists():
+        api_root = _extract_src(repo, ref, src_path, Path(tmp))
+        if api_root is None:
             return None
 
         try:
@@ -187,7 +225,7 @@ def get_api_at_index(repo: Repo, src_path: str = "src") -> dict[str, list[str]] 
     """Extract the public API surface from the current git staging area (index).
 
     Writes the staged tree with ``git write-tree``, then uses ``git archive`` on the
-    resulting tree SHA to extract files into a temporary directory before invoking
+    resulting tree SHA to extract only ``src_path`` into a temporary directory before invoking
     ``sheridan.iceberg.get_public_api()``.
 
     Args:
@@ -200,7 +238,7 @@ def get_api_at_index(repo: Repo, src_path: str = "src") -> dict[str, list[str]] 
         ``src_path`` does not exist in the staging area.
 
     Raises:
-        GitError: If tree materialisation or archive extraction fails.
+        GitError: If ``git archive`` or the tar extraction fails.
         SurfaceError: If ``get_public_api`` raises any exception.
 
     Notes:
@@ -212,13 +250,8 @@ def get_api_at_index(repo: Repo, src_path: str = "src") -> dict[str, list[str]] 
     tree_sha: str = repo.git.write_tree()
 
     with tempfile.TemporaryDirectory() as tmp:
-        proc = repo.git.archive(tree_sha, format="tar", as_process=True)
-        with tarfile.open(fileobj=proc.stdout, mode="r|") as tar:
-            tar.extractall(tmp, filter="data")
-        proc.wait()
-
-        api_root = Path(tmp) / src_path
-        if not api_root.exists():
+        api_root = _extract_src(repo, tree_sha, src_path, Path(tmp))
+        if api_root is None:
             return None
 
         try:
