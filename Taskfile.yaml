@@ -67,14 +67,29 @@ tasks:
           exit 1
         fi
 
+  api:update:
+    desc: Write the public API of src/sheridan/ to api.txt
+    cmds:
+      - uv run iceberg src/sheridan/ --output api.txt
+
+  api:check:
+    desc: Fail if the public API is different from api.txt
+    cmds:
+      - |
+        if ! uv run iceberg src/sheridan/ | diff -u api.txt -; then
+          echo "The public API is different from api.txt. Run 'task api:update' and commit api.txt." >&2
+          exit 1
+        fi
+
   check:
-    desc: Run all gates (lint:check, format:check, typecheck, test, sdist:check)
+    desc: Run all gates (lint:check, format:check, typecheck, test, sdist:check, api:check)
     cmds:
       - task: lint:check
       - task: format:check
       - task: typecheck
       - task: test
       - task: sdist:check
+      - task: api:check
 
   docs:build:
     desc: Build Zensical documentation
