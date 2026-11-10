@@ -36,8 +36,7 @@ jobs:
 
 - `base.sha` is the `HEAD` of the target branch (for example `main`) at the time of the pull request event.
 - `head.sha` is the `HEAD` of the pull request branch.
-- The check fails only if the title tells less than the API change. A removed name needs a `!` in the title, for example `feat!:`. An added name needs `feat` or a `!`.
-- The check never blocks other title types (`docs:`, `chore:`, `test:` and other types).
+- The check uses the same rules as the [commit-msg hook](commit-msg-hook.md). The title type must be possible for all the changes in the pull request. For example, if the pull request changes code and tests, `test:` fails.
 - The check keeps the scope. If the title is `fix(parser): …` and diffract finds an added name, the message shows `feat(parser):`.
 
 Do not put `${{ github.event.pull_request.title }}` directly in the `run` script. A

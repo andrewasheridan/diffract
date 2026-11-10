@@ -7,12 +7,13 @@ from pathlib import Path
 import pytest
 
 from sheridan.diffract.cli import (
-    _extract_scope,
+    _describe_allowed,
     _format_commit_type,
     _format_human,
+    _is_allowed,
+    _is_written_by_git,
     _parse_written_type,
     _resolve_exit_code,
-    _tells_less_than,
     _WrittenType,
     main,
 )
@@ -410,26 +411,36 @@ class TestMain:
             main()
         assert mock_check.call_args.kwargs["tests_path"] == "qa"
 
+
+class TestParseWrittenType:
     """Unit tests for _parse_written_type()."""
 
     @pytest.mark.parametrize(
         ("message", "expected"),
         [
-            ("feat: add thing", _WrittenType("feat:", "feat", breaking=False)),
-            ("feat!: remove thing", _WrittenType("feat!:", "feat", breaking=True)),
-            ("feat(api)!: remove thing", _WrittenType("feat(api)!:", "feat", breaking=True)),
-            ("feat(api): add thing", _WrittenType("feat(api):", "feat", breaking=False)),
-            ("fix: correct bug", _WrittenType("fix:", "fix", breaking=False)),
-            ("fix(parser): correct bug", _WrittenType("fix(parser):", "fix", breaking=False)),
-            ("fix!: correct bug", _WrittenType("fix!:", "fix", breaking=True)),
-            ("refactor: restructure", _WrittenType("refactor:", "refactor", breaking=False)),
-            ("refactor!: restructure", _WrittenType("refactor!:", "refactor", breaking=True)),
-            ("fix: x\n\nBREAKING CHANGE: y", _WrittenType("fix:", "fix", breaking=True)),
-            ("fix: x\n\nBREAKING-CHANGE: y", _WrittenType("fix:", "fix", breaking=True)),
-            ("fix: BREAKING CHANGE: y", _WrittenType("fix:", "fix", breaking=False)),
-            ("fix: x\n\nNot a BREAKING CHANGE: y", _WrittenType("fix:", "fix", breaking=False)),
-            ("docs: update readme", None),
-            ("chore: bump deps", None),
+            ("feat: add thing", _WrittenType("feat", None, breaking=False)),
+            ("feat!: remove thing", _WrittenType("feat", None, breaking=True)),
+            ("feat(api)!: remove thing", _WrittenType("feat", "api", breaking=True)),
+            ("feat(api): add thing", _WrittenType("feat", "api", breaking=False)),
+            ("feat(my-scope): add thing", _WrittenType("feat", "my-scope", breaking=False)),
+            ("fix: correct bug", _WrittenType("fix", None, breaking=False)),
+            ("fix(parser): correct bug", _WrittenType("fix", "parser", breaking=False)),
+            ("fix!: correct bug", _WrittenType("fix", None, breaking=True)),
+            ("refactor: restructure", _WrittenType("refactor", None, breaking=False)),
+            ("perf: faster", _WrittenType("perf", None, breaking=False)),
+            ("style: format", _WrittenType("style", None, breaking=False)),
+            ("test(cli): add a test", _WrittenType("test", "cli", breaking=False)),
+            ("docs: update readme", _WrittenType("docs", None, breaking=False)),
+            ("ci!: drop a job", _WrittenType("ci", None, breaking=True)),
+            ("chore: bump deps", _WrittenType("chore", None, breaking=False)),
+            ("build(deps): bump", _WrittenType("build", "deps", breaking=False)),
+            ("revert: undo x", _WrittenType("revert", None, breaking=False)),
+            ("fix: x\n\nBREAKING CHANGE: y", _WrittenType("fix", None, breaking=True)),
+            ("chore: x\n\nBREAKING-CHANGE: y", _WrittenType("chore", None, breaking=True)),
+            ("fix: BREAKING CHANGE: y", _WrittenType("fix", None, breaking=False)),
+            ("fix: x\n\nNot a BREAKING CHANGE: y", _WrittenType("fix", None, breaking=False)),
+            ("wip: something", None),
+            ("Feat: add thing", None),
             ("", None),
             ("just a message", None),
             ("   ", None),
@@ -439,54 +450,78 @@ class TestMain:
         assert _parse_written_type(message) == expected
 
 
-class TestTellsLessThan:
-    """Unit tests for _tells_less_than(): the message fails only if it hides an API change."""
-
-    @pytest.mark.parametrize("message", ["feat: x", "feat!: x", "fix: x", "fix!: x", "refactor: x", "refactor!: x"])
-    def test_no_name_change_always_passes(self, message: str, empty_diff: ApiDiff) -> None:
-        written = _parse_written_type(message)
-        assert written is not None
-        assert not _tells_less_than(written, empty_diff)
+class TestIsWrittenByGit:
+    """Unit tests for _is_written_by_git()."""
 
     @pytest.mark.parametrize(
-        ("message", "expected"),
+        "message",
         [
-            ("feat!: x", False),
-            ("fix!: x", False),
-            ("refactor!: x", False),
-            ("feat: x\n\nBREAKING CHANGE: y", False),
-            ("fix: x\n\nBREAKING CHANGE: y", False),
-            ("feat: x", True),
-            ("fix: x", True),
-            ("refactor: x", True),
+            "Merge branch 'main' into feature",
+            'Revert "feat: add thing"\n\nThis reverts commit abc.',
+            "fixup! fix: correct bug",
+            "squash! feat: add thing",
         ],
     )
-    def test_removed_names_need_breaking(self, message: str, expected: bool, removal_diff: ApiDiff) -> None:
-        written = _parse_written_type(message)
-        assert written is not None
-        assert _tells_less_than(written, removal_diff) is expected
+    def test_git_messages(self, message: str) -> None:
+        assert _is_written_by_git(message)
+
+    @pytest.mark.parametrize("message", ["feat: add thing", "Merged things", "tidy up", ""])
+    def test_other_messages(self, message: str) -> None:
+        assert not _is_written_by_git(message)
+
+
+_ALL_TYPES = ("feat", "fix", "refactor", "perf", "style", "test", "docs", "ci", "chore", "build")
+
+_ALLOWED_BY_RESULT: dict[CommitType, set[str]] = {
+    CommitType.feat_breaking: set(),
+    CommitType.feat: {"feat"},
+    CommitType.code: {"fix", "refactor", "perf", "style", "feat"},
+    CommitType.test: {"test"},
+    CommitType.other: {"docs", "ci", "chore", "build"},
+}
+
+
+class TestIsAllowed:
+    """Unit tests for _is_allowed(): each row of the table passes with its types only."""
+
+    @pytest.mark.parametrize("commit_type", list(CommitType))
+    @pytest.mark.parametrize("base", _ALL_TYPES)
+    def test_types_without_breaking(self, commit_type: CommitType, base: str) -> None:
+        written = _WrittenType(base, None, breaking=False)
+        assert _is_allowed(written, commit_type) is (base in _ALLOWED_BY_RESULT[commit_type])
+
+    @pytest.mark.parametrize("commit_type", [CommitType.feat_breaking, CommitType.feat, CommitType.code])
+    @pytest.mark.parametrize("base", _ALL_TYPES)
+    def test_breaking_message_passes_for_api_and_code_results(self, commit_type: CommitType, base: str) -> None:
+        assert _is_allowed(_WrittenType(base, None, breaking=True), commit_type)
+
+    @pytest.mark.parametrize(("commit_type", "base"), [(CommitType.test, "fix"), (CommitType.other, "feat")])
+    def test_breaking_message_fails_for_test_and_other_results(self, commit_type: CommitType, base: str) -> None:
+        assert not _is_allowed(_WrittenType(base, None, breaking=True), commit_type)
+
+    @pytest.mark.parametrize("commit_type", list(CommitType))
+    def test_revert_type_always_passes(self, commit_type: CommitType) -> None:
+        assert _is_allowed(_WrittenType("revert", None, breaking=False), commit_type)
+
+
+class TestDescribeAllowed:
+    """Unit tests for _describe_allowed()."""
 
     @pytest.mark.parametrize(
-        ("message", "expected"),
+        ("commit_type", "expected"),
         [
-            ("feat: x", False),
-            ("feat!: x", False),
-            ("fix!: x", False),
-            ("refactor!: x", False),
-            ("fix: x", True),
-            ("refactor: x", True),
+            (CommitType.feat_breaking, "any type with a '!' or a 'BREAKING CHANGE:' footer"),
+            (CommitType.feat, "feat, or any type with a '!' or a 'BREAKING CHANGE:' footer"),
+            (
+                CommitType.code,
+                "fix, refactor, perf, style, feat, or any type with a '!' or a 'BREAKING CHANGE:' footer",
+            ),
+            (CommitType.test, "test"),
+            (CommitType.other, "docs, ci, chore, build"),
         ],
     )
-    def test_added_names_need_feat_or_bang(self, message: str, expected: bool, addition_diff: ApiDiff) -> None:
-        written = _parse_written_type(message)
-        assert written is not None
-        assert _tells_less_than(written, addition_diff) is expected
-
-    @pytest.mark.parametrize(("message", "expected"), [("feat: x", True), ("feat!: x", False)])
-    def test_mixed_change_needs_breaking(self, message: str, expected: bool, mixed_diff: ApiDiff) -> None:
-        written = _parse_written_type(message)
-        assert written is not None
-        assert _tells_less_than(written, mixed_diff) is expected
+    def test_describe(self, commit_type: CommitType, expected: str) -> None:
+        assert _describe_allowed(commit_type) == expected
 
 
 class TestValidateMsgFile:
@@ -533,7 +568,7 @@ class TestValidateMsgFile:
     ) -> None:
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("fix: correct bug\n", encoding="utf-8")
-        result = _make_result(CommitType.other, empty_diff)
+        result = _make_result(CommitType.code, empty_diff)
         mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
         monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
         with pytest.raises(SystemExit) as exc_info:
@@ -589,8 +624,8 @@ class TestValidateMsgFile:
             main()
         assert exc_info.value.code == 1
         err = capsys.readouterr().err
-        assert "fix:" in err
-        assert "feat:" in err
+        assert "written:  fix\n" in err
+        assert "possible: feat, or any type with a '!'" in err
 
     def test_mismatch_stderr_includes_api_diff(
         self,
@@ -660,7 +695,7 @@ class TestValidateMsgFile:
             main()
         assert exc_info.value.code == 0
 
-    def test_empty_file_exits_zero(
+    def test_empty_file_exits_one(
         self,
         tmp_path: Path,
         empty_diff: ApiDiff,
@@ -674,9 +709,9 @@ class TestValidateMsgFile:
         monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
         with pytest.raises(SystemExit) as exc_info:
             main()
-        assert exc_info.value.code == 0
+        assert exc_info.value.code == 1
 
-    def test_whitespace_only_file_exits_zero(
+    def test_whitespace_only_file_exits_one(
         self,
         tmp_path: Path,
         empty_diff: ApiDiff,
@@ -690,7 +725,7 @@ class TestValidateMsgFile:
         monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
         with pytest.raises(SystemExit) as exc_info:
             main()
-        assert exc_info.value.code == 0
+        assert exc_info.value.code == 1
 
     def test_multiline_only_first_line_used(
         self,
@@ -789,6 +824,122 @@ class TestValidateMsgFile:
             main()
         assert exc_info.value.code == 1
 
+    @pytest.mark.parametrize(
+        ("message", "commit_type", "diff_fixture"),
+        [
+            pytest.param("chore: tidy up\n", CommitType.feat_breaking, "removal_diff", id="chore-removal"),
+            pytest.param("docs: update\n", CommitType.code, "empty_diff", id="docs-code"),
+            pytest.param("fix: correct\n", CommitType.test, "empty_diff", id="fix-test"),
+            pytest.param("test: add\n", CommitType.other, "empty_diff", id="test-other"),
+            pytest.param("feat: add\n", CommitType.other, "empty_diff", id="feat-other"),
+            pytest.param("tidy up\n", CommitType.other, "empty_diff", id="no-type"),
+            pytest.param("wip: tidy up\n", CommitType.other, "empty_diff", id="unknown-type"),
+        ],
+    )
+    def test_type_not_possible_exits_one(
+        self,
+        message: str,
+        commit_type: CommitType,
+        diff_fixture: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        request: pytest.FixtureRequest,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        """A message with no type, an unknown type or a type that is not possible fails."""
+        msg_file = tmp_path / "COMMIT_EDITMSG"
+        msg_file.write_text(message, encoding="utf-8")
+        result = _make_result(commit_type, request.getfixturevalue(diff_fixture))
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
+        monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 1
+
+    @pytest.mark.parametrize(
+        ("message", "commit_type", "diff_fixture"),
+        [
+            pytest.param("perf: faster\n", CommitType.code, "empty_diff", id="perf-code"),
+            pytest.param("style: format\n", CommitType.code, "empty_diff", id="style-code"),
+            pytest.param("test: add\n", CommitType.test, "empty_diff", id="test-test"),
+            pytest.param("ci: add a job\n", CommitType.other, "empty_diff", id="ci-other"),
+            pytest.param("build: bump\n", CommitType.other, "empty_diff", id="build-other"),
+            pytest.param("chore!: drop\n", CommitType.feat_breaking, "removal_diff", id="chore-bang-removal"),
+            pytest.param("revert: undo\n", CommitType.code, "empty_diff", id="revert-type"),
+        ],
+    )
+    def test_possible_type_exits_zero(
+        self,
+        message: str,
+        commit_type: CommitType,
+        diff_fixture: str,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        request: pytest.FixtureRequest,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        """A message with a type that is possible for the result passes."""
+        msg_file = tmp_path / "COMMIT_EDITMSG"
+        msg_file.write_text(message, encoding="utf-8")
+        result = _make_result(commit_type, request.getfixturevalue(diff_fixture))
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
+        monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 0
+
+    @pytest.mark.parametrize(
+        "message",
+        [
+            "Merge branch 'main' into feature\n",
+            'Revert "feat: add thing"\n\nThis reverts commit abc.\n',
+            "fixup! fix: correct bug\n",
+            "squash! feat: add thing\n",
+        ],
+    )
+    def test_git_message_exits_zero(
+        self,
+        message: str,
+        tmp_path: Path,
+        removal_diff: ApiDiff,
+        monkeypatch: pytest.MonkeyPatch,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        """diffract does not check the messages that git writes."""
+        msg_file = tmp_path / "COMMIT_EDITMSG"
+        msg_file.write_text(message, encoding="utf-8")
+        result = _make_result(CommitType.feat_breaking, removal_diff)
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
+        monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 0
+
+    @pytest.mark.parametrize(
+        ("message", "written"),
+        [("chore: tidy up\n", "chore"), ("tidy up\n", "(no known type)")],
+    )
+    def test_mismatch_stderr_shows_written_and_possible_types(
+        self,
+        message: str,
+        written: str,
+        tmp_path: Path,
+        empty_diff: ApiDiff,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        msg_file = tmp_path / "COMMIT_EDITMSG"
+        msg_file.write_text(message, encoding="utf-8")
+        result = _make_result(CommitType.code, empty_diff)
+        mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
+        monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
+        with pytest.raises(SystemExit):
+            main()
+        err = capsys.readouterr().err
+        assert f"written:  {written}\n" in err
+        assert "possible: fix, refactor, perf, style, feat" in err
+
     def test_missing_file_exits_three(
         self,
         tmp_path: Path,
@@ -805,31 +956,6 @@ class TestValidateMsgFile:
             main()
         assert exc_info.value.code == 3
         assert "cannot read" in capsys.readouterr().err
-
-
-class TestExtractScope:
-    """Unit tests for _extract_scope()."""
-
-    @pytest.mark.parametrize(
-        ("first_line", "expected"),
-        [
-            ("feat: add thing", None),
-            ("feat!: remove thing", None),
-            ("fix: correct bug", None),
-            ("refactor: restructure", None),
-            ("feat(api): add thing", "api"),
-            ("feat(api)!: remove thing", "api"),
-            ("fix(parser): correct bug", "parser"),
-            ("refactor(core): restructure", "core"),
-            ("feat(my-scope): add thing", "my-scope"),
-            ("docs: update readme", None),
-            ("chore: bump deps", None),
-            ("", None),
-            ("just a message", None),
-        ],
-    )
-    def test_extract_scope(self, first_line: str, expected: str | None) -> None:
-        assert _extract_scope(first_line) == expected
 
 
 class TestFormatCommitType:
@@ -851,7 +977,7 @@ class TestFormatCommitType:
 class TestScopedValidateMsgFile:
     """Tests that the output keeps the scope in the written and the suggested commit type."""
 
-    def test_mismatch_with_scope_shows_scope_in_written_and_detected(
+    def test_mismatch_with_scope_shows_scope_in_written_and_suggested(
         self,
         tmp_path: Path,
         addition_diff: ApiDiff,
@@ -859,7 +985,7 @@ class TestScopedValidateMsgFile:
         capsys: pytest.CaptureFixture[str],
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """For fix(parser): and a feat result, stderr must show fix(parser): and feat(parser):."""
+        """For fix(parser): and a feat result, stderr must show fix(parser) and feat(parser):."""
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("fix(parser): correct something\n", encoding="utf-8")
         result = _make_result(CommitType.feat, addition_diff)
@@ -869,7 +995,7 @@ class TestScopedValidateMsgFile:
             main()
         assert exc_info.value.code == 1
         err = capsys.readouterr().err
-        assert "fix(parser):" in err
+        assert "written:  fix(parser)\n" in err
         assert "feat(parser):" in err
 
     def test_mismatch_with_scope_suggested_prefix_contains_scope(
@@ -900,7 +1026,7 @@ class TestScopedValidateMsgFile:
         capsys: pytest.CaptureFixture[str],
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """For fix(core): and a feat! result, stderr must show feat(core)!: as the detected type."""
+        """For fix(core): and a feat! result, stderr must show feat(core)!: as the suggested prefix."""
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("fix(core): correct something\n", encoding="utf-8")
         result = _make_result(CommitType.feat_breaking, removal_diff)
@@ -910,7 +1036,7 @@ class TestScopedValidateMsgFile:
             main()
         assert exc_info.value.code == 1
         err = capsys.readouterr().err
-        assert "fix(core):" in err
+        assert "written:  fix(core)\n" in err
         assert "feat(core)!:" in err
 
     def test_scope_ignored_for_type_classification(
@@ -937,10 +1063,10 @@ class TestScopedValidateMsgFile:
         monkeypatch: pytest.MonkeyPatch,
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        """fix(scope): for a fix result must exit 0."""
+        """fix(scope): for a code result must exit 0."""
         msg_file = tmp_path / "COMMIT_EDITMSG"
         msg_file.write_text("fix(scope): patch something\n", encoding="utf-8")
-        result = _make_result(CommitType.other, empty_diff)
+        result = _make_result(CommitType.code, empty_diff)
         mocker.patch("sheridan.diffract.cli.check_staged", return_value=result)
         monkeypatch.setattr(sys, "argv", ["diffract", "--validate-msg-file", str(msg_file)])
         with pytest.raises(SystemExit) as exc_info:

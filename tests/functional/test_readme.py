@@ -56,7 +56,10 @@ def test_the_readme_outputs_are_in_the_readme() -> None:
     assert f"```\n{BREAKING_OUTPUT}```" in README
     assert f"```\n{OTHER_OUTPUT}```" in README
     assert "Suggested commit prefix: feat(parser):" in README
-    assert "diffract: commit type mismatch\n  written:  fix(parser):\n  detected: feat(parser):" in README
+    assert (
+        "diffract: commit type mismatch\n  written:  fix(parser)\n"
+        "  possible: feat, or any type with a '!' or a 'BREAKING CHANGE:' footer"
+    ) in README
 
 
 def test_default_and_explicit_refs(readme_repo: GitRepo) -> None:
@@ -105,7 +108,10 @@ def test_scope_in_the_suggestion_and_the_mismatch(readme_repo: GitRepo, tmp_path
 
     assert proc.returncode == 1
     assert "Suggested commit prefix: feat(parser):" in proc.stderr
-    assert "diffract: commit type mismatch\n  written:  fix(parser):\n  detected: feat(parser):" in proc.stderr
+    assert (
+        "diffract: commit type mismatch\n  written:  fix(parser)\n"
+        "  possible: feat, or any type with a '!' or a 'BREAKING CHANGE:' footer"
+    ) in proc.stderr
 
 
 def test_github_actions_example(readme_repo: GitRepo, tmp_path: Path) -> None:
@@ -119,8 +125,10 @@ def test_github_actions_example(readme_repo: GitRepo, tmp_path: Path) -> None:
     assert readme_repo.diffract(base, head, "--validate-msg-file", str(title)).returncode == 0
     title.write_text("fix: remove OldHelper", encoding="utf-8")
     assert readme_repo.diffract(base, head, "--validate-msg-file", str(title)).returncode == 1
-    title.write_text("chore: remove OldHelper", encoding="utf-8")
+    title.write_text("chore!: remove OldHelper", encoding="utf-8")
     assert readme_repo.diffract(base, head, "--validate-msg-file", str(title)).returncode == 0
+    title.write_text("chore: remove OldHelper", encoding="utf-8")
+    assert readme_repo.diffract(base, head, "--validate-msg-file", str(title)).returncode == 1
 
 
 @pytest.mark.parametrize(

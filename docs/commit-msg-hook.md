@@ -1,8 +1,8 @@
 # commit-msg hook
 
 diffract has a `commit-msg` hook for [pre-commit](https://pre-commit.com) and
-[prek](https://github.com/j178/prek). The hook rejects a commit message only if the
-message tells less than the change to the public API.
+[prek](https://github.com/j178/prek). The hook rejects a commit message if the commit
+type is not possible for the change.
 
 ## Install the hook
 
@@ -28,13 +28,21 @@ arguments. Read [Configuration](configuration.md).
 
 ## The rules
 
-- If the commit removes a public name, the message must have a `!` (for example `feat!:` or `fix!:`) or a `BREAKING CHANGE:` footer.
-- If the commit adds a public name, the type must be `feat`, or the message must have a `!`.
-- The hook checks only the `feat`, `fix` and `refactor` types. It never blocks other types, for example `docs:`, `chore:` or `test:`.
+| Change that diffract finds | Types that pass |
+|---|---|
+| A public name was removed (`feat!`) | Any type with a `!` or a `BREAKING CHANGE:` footer |
+| A public name was added (`feat`) | `feat`, or any type with a `!` or a `BREAKING CHANGE:` footer |
+| Python files in the source directory changed (`code`) | `fix`, `refactor`, `perf`, `style` or `feat`, or any type with a `!` or a `BREAKING CHANGE:` footer |
+| Only Python files in the test directory changed (`test`) | `test` |
+| All other changes (`other`) | `docs`, `ci`, `chore` or `build` |
 
-The detected type is only an estimate from the public names. Thus the hook accepts a
-message that tells more than the detected type. For example, it accepts `fix:` for a
-change to a function body. It also accepts `feat!:` for a breaking change in behavior.
+The hook also obeys these rules:
+
+- A message with no type, or with a type that is not a Conventional Commit type, fails.
+- A `revert:` message always passes, because a revert can undo any change.
+- The hook does not check the messages that git writes: `Merge …`, `Revert "…"`, `fixup! …` and `squash! …`.
+
+A change in behavior does not always change a public name. Thus the hook accepts `feat` and a breaking message for a `code` change.
 
 ## What the hook compares
 
@@ -45,14 +53,15 @@ last commit, and the staging area has the content of the new commit.
 
 ## Output
 
-If the message tells less than the API change, the hook writes the API change and the
-two types to stderr. Then it exits with code 1. The output keeps the scope of your
-message:
+If the commit type is not possible for the change, the hook writes the change, the
+written type and the possible types to stderr. Then it exits with code 1. The written
+type keeps the scope of your message. For example, `fix(parser): …` for a change that
+adds a public name gives:
 
 ```
 diffract: commit type mismatch
-  written:  fix(parser):
-  detected: feat(parser):
+  written:  fix(parser)
+  possible: feat, or any type with a '!' or a 'BREAKING CHANGE:' footer
 ```
 
 ## Run the check without the hook

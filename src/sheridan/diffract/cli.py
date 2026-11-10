@@ -17,14 +17,30 @@ from sheridan.diffract.config import load_config
 from sheridan.diffract.enums import CommitType
 from sheridan.diffract.exceptions import DiffractError
 from sheridan.diffract.git_utils import get_repo
-from sheridan.diffract.models import ApiDiff, DiffractResult
+from sheridan.diffract.models import DiffractResult
 
-_COMMIT_TYPE_RE: re.Pattern[str] = re.compile(r"^(feat|fix|refactor)(\([^)]*\))?(!)?:")
+_COMMIT_TYPE_RE: re.Pattern[str] = re.compile(r"^([a-z]+)(\(([^)]*)\))?(!)?:")
 _BREAKING_FOOTER_RE: re.Pattern[str] = re.compile(r"^BREAKING[ -]CHANGE: ", re.MULTILINE)
 _ISSUES_URL = "https://github.com/andrewasheridan/diffract/issues"
 _ERROR_EXIT_CODE = 3
 # Only for these groups can diffract give one commit prefix.
 _FEATURE_TYPES = (CommitType.feat_breaking, CommitType.feat)
+_CONVENTIONAL_TYPES = frozenset(
+    {"feat", "fix", "refactor", "perf", "style", "test", "docs", "ci", "chore", "build", "revert"}
+)
+# git writes these messages itself. diffract does not check them.
+_GIT_MESSAGE_PREFIXES = ("Merge ", 'Revert "', "fixup! ", "squash! ")
+# A change in behavior does not always change a public name. Thus feat is also
+# possible when diffract finds only a code change.
+_ALLOWED_TYPES: dict[CommitType, frozenset[str]] = {
+    CommitType.feat_breaking: frozenset(),
+    CommitType.feat: frozenset({"feat"}),
+    CommitType.code: frozenset({"fix", "refactor", "perf", "style", "feat"}),
+    CommitType.test: frozenset({"test"}),
+    CommitType.other: frozenset({"docs", "ci", "chore", "build"}),
+}
+# For these groups, a breaking message is always correct.
+_BREAKING_ALLOWED = (CommitType.feat_breaking, CommitType.feat, CommitType.code)
 
 
 @dataclass(frozen=True)
@@ -32,14 +48,21 @@ class _WrittenType:
     """The commit type that a commit message gives.
 
     Attributes:
-        prefix: The prefix as written, for example ``"fix(parser)!:"``.
-        base: The type without scope and ``!``: ``"feat"``, ``"fix"`` or ``"refactor"``.
+        base: The type without scope and ``!``, for example ``"fix"``.
+        scope: The scope without parentheses, for example ``"parser"``, or ``None``.
         breaking: True if the header has a ``!`` or the body has a ``BREAKING CHANGE:`` footer.
     """
 
-    prefix: str
     base: str
+    scope: str | None
     breaking: bool
+
+    @property
+    def label(self) -> str:
+        """The type as the error message shows it, for example ``"fix(parser)!"``."""
+        scope = f"({self.scope})" if self.scope is not None else ""
+        bang = "!" if self.breaking else ""
+        return f"{self.base}{scope}{bang}"
 
 
 class _ArgumentParser(argparse.ArgumentParser):
@@ -129,10 +152,12 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="validate_msg_file",
         metavar="MSGFILE",
         help=(
-            "The path of a commit message file. The check fails only if the message tells less "
-            "than the API change: removed public names need a '!' or a 'BREAKING CHANGE:' "
-            "footer, and added public names need 'feat' or a '!'. "
-            "diffract does not check types other than feat, fix and refactor."
+            "The path of a commit message file. The check fails if the commit type is not "
+            "possible for the change. Removed public names need a '!' or a 'BREAKING CHANGE:' "
+            "footer. Added public names need 'feat' or a '!'. Code changes need fix, refactor, "
+            "perf, style, feat or a '!'. Test changes need test. Other changes need docs, ci, "
+            "chore or build. A message with no known type fails. diffract does not check "
+            "merge, revert, fixup and squash messages from git."
         ),
     )
 
@@ -225,70 +250,79 @@ def _resolve_exit_code(result: DiffractResult, use_exit_code: bool) -> int:
 def _parse_written_type(message: str) -> _WrittenType | None:
     """Parse the Conventional Commit type from a commit message.
 
-    The function knows only ``feat``, ``fix`` and ``refactor``, with or without a scope
-    and a ``!``. Other types, for example ``docs:`` or ``chore:``, give ``None``. Thus
-    diffract never blocks them.
+    The function knows all the Conventional Commit types, with or without a scope and
+    a ``!``.
 
     Args:
         message: The full commit message. The type is in the first line. A
             ``BREAKING CHANGE:`` or ``BREAKING-CHANGE:`` footer can be in the lines after it.
 
     Returns:
-        The written type, or ``None`` if the first line has no known type.
+        The written type, or ``None`` if the first line has no type or an unknown type.
     """
     lines = message.splitlines()
     first_line = lines[0] if lines else ""
     m = _COMMIT_TYPE_RE.match(first_line)
-    if m is None:
+    if m is None or m.group(1) not in _CONVENTIONAL_TYPES:
         return None
 
     body = "\n".join(lines[1:])
-    breaking = m.group(3) is not None or _BREAKING_FOOTER_RE.search(body) is not None
+    breaking = m.group(4) is not None or _BREAKING_FOOTER_RE.search(body) is not None
 
-    return _WrittenType(prefix=m.group(0), base=m.group(1), breaking=breaking)
+    return _WrittenType(base=m.group(1), scope=m.group(3), breaking=breaking)
 
 
-def _tells_less_than(written: _WrittenType, diff: ApiDiff) -> bool:
-    """Find if a written commit type tells less than the API change.
+def _is_written_by_git(message: str) -> bool:
+    """Find if git wrote the commit message, for a merge, a revert, a fixup or a squash.
 
-    The detected type is only an estimate from the public names. Thus a message can
-    give more than the detected type, for example ``fix:`` for a change to a function
-    body, or ``feat!:`` for a change in behavior. A message fails only when it hides a
-    change to the public names:
+    Args:
+        message: The full commit message.
 
-    - Removed public names, and the message is not breaking.
-    - Added public names, and the type is not ``feat`` and the message is not breaking.
+    Returns:
+        True if the first line starts as git writes it.
+    """
+    return message.startswith(_GIT_MESSAGE_PREFIXES)
+
+
+def _is_allowed(written: _WrittenType, commit_type: CommitType) -> bool:
+    """Find if a written commit type is possible for the result of diffract.
+
+    A ``revert`` type is always possible, because a revert can undo any change.
 
     Args:
         written: The commit type from the message.
-        diff: The API diff for the commit.
+        commit_type: The group of possible types that diffract found.
 
     Returns:
-        True if the message tells less than the API change.
+        True if the written type is possible for the result.
     """
-    if written.breaking:
-        return False
-    if diff.is_breaking:
+    if written.base == "revert":
         return True
-    return diff.has_additions and written.base != "feat"
+    if written.breaking and commit_type in _BREAKING_ALLOWED:
+        return True
+    return written.base in _ALLOWED_TYPES[commit_type]
 
 
-def _extract_scope(first_line: str) -> str | None:
-    """Get the scope from the first line of a commit message.
+def _describe_allowed(commit_type: CommitType) -> str:
+    """Write the commit types that are possible for a result, for the error message.
 
     Args:
-        first_line: The first line of the commit message.
+        commit_type: The group of possible types that diffract found.
 
     Returns:
-        The scope without parentheses, for example ``"parser"`` from
-        ``"feat(parser): …"``. ``None`` if the line has no scope, or if the line
-        does not start with a known Conventional Commit type.
+        The possible types, for example ``"fix, refactor, perf, style"``.
     """
-    m = _COMMIT_TYPE_RE.match(first_line)
-    if m is None:
-        return None
-    raw = m.group(2)
-    return raw[1:-1] if raw is not None else None
+    if commit_type == CommitType.feat_breaking:
+        return "any type with a '!' or a 'BREAKING CHANGE:' footer"
+
+    types = list(commit_type.possible_types)
+    for base in sorted(_ALLOWED_TYPES[commit_type] - set(types)):
+        types.append(base)
+    text = ", ".join(types)
+
+    if commit_type in _BREAKING_ALLOWED:
+        text += ", or any type with a '!' or a 'BREAKING CHANGE:' footer"
+    return text
 
 
 def _format_commit_type(commit_type: CommitType, scope: str | None) -> str:
@@ -325,8 +359,8 @@ def main() -> None:
 
     The exit codes:
       - 0: No public name changed, or the command has no ``--exit-code`` flag.
-      - 1: A public name was removed (with ``--exit-code``), or the commit message
-        tells less than the API change.
+      - 1: A public name was removed (with ``--exit-code``), or the commit type in
+        the commit message is not possible for the change.
       - 2: A public name was added and no public name was removed (with ``--exit-code``).
       - 3: An error. This can be a usage error, a git, file or configuration error, or
         an unexpected exception.
@@ -383,19 +417,20 @@ def _run() -> None:
             print(f"diffract: cannot read the commit message file: {exc}", file=sys.stderr)
             sys.exit(_ERROR_EXIT_CODE)
 
-        _lines = raw.splitlines()
-        first_line = _lines[0] if _lines else ""
-        written = _parse_written_type(raw)
-        scope = _extract_scope(first_line)
-
-        if written is None or not _tells_less_than(written, result.diff):
+        if _is_written_by_git(raw):
             sys.exit(0)
 
+        written = _parse_written_type(raw)
+        if written is not None and _is_allowed(written, result.commit_type):
+            sys.exit(0)
+
+        scope = written.scope if written is not None else None
+        written_label = written.label if written is not None else "(no known type)"
         print(_format_human(result, scope=scope), file=sys.stderr)
         print(
             f"\ndiffract: commit type mismatch"
-            f"\n  written:  {written.prefix}"
-            f"\n  detected: {_format_commit_type(result.commit_type, scope)}",
+            f"\n  written:  {written_label}"
+            f"\n  possible: {_describe_allowed(result.commit_type)}",
             file=sys.stderr,
         )
         sys.exit(1)
