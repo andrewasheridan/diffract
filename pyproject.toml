@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sheridan-diffract"
-version = "1.0.3"
+version = "1.0.4"
 description = "Classifies public API changes between git commits as conventional commit types"
 readme = "README.md"
 license = "MIT"
@@ -148,7 +148,7 @@ exclude_also = [
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "1.0.3"
+version = "1.0.4"
 version_files = [
     "pyproject.toml:^version",
 ]
