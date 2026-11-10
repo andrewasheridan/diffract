@@ -17,8 +17,9 @@ Most semver tools trust the developer to classify their own changes correctly. `
 | Only internal/private changes in the source directory | `refactor` |
 | No changes detected | `fix` |
 
-diffract counts a code change only in the `.py` files in the source directory (`src` by default).
-A change only to a `.py` file in `tests/`, `scripts/` or `docs/` gives `fix`, not `refactor`.
+diffract counts a code change only in the `.py` and `.pyi` files in the source directory
+(`src` by default). A change only to a `.py` or `.pyi` file in `tests/`, `scripts/` or
+`docs/` gives `fix`, not `refactor`.
 
 ## Installation
 

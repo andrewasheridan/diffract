@@ -88,6 +88,15 @@ class TestHasPythonChanges:
         repo = self._repo_with_diff([self._diff_item("", "src/pkg/new_module.py")])
         assert has_python_changes(repo, "HEAD~1", "HEAD") is True
 
+    def test_returns_true_when_pyi_file_changed(self) -> None:
+        """A stub file is part of the public API of the package."""
+        repo = self._repo_with_diff([self._diff_item("src/pkg/module.pyi", "src/pkg/module.pyi")])
+        assert has_python_changes(repo, "HEAD~1", "HEAD") is True
+
+    def test_ignores_pyi_files_outside_src(self) -> None:
+        repo = self._repo_with_diff([self._diff_item("tests/stubs/mod.pyi", "tests/stubs/mod.pyi")])
+        assert has_python_changes(repo, "HEAD~1", "HEAD") is False
+
     @pytest.mark.parametrize(
         "path", ["tests/test_mod.py", "scripts/tool.py", "docs/conf.py", "setup.py", "srcx/mod.py"]
     )
@@ -421,6 +430,12 @@ class TestHasPythonChangesIndex:
 
     def test_ignores_py_files_outside_src(self) -> None:
         assert has_python_changes_index(self._repo("tests/test_mod.py\nscripts/tool.py\nsetup.py")) is False
+
+    def test_returns_true_when_pyi_file_in_index_diff(self) -> None:
+        assert has_python_changes_index(self._repo("README.md\nsrc/pkg/module.pyi")) is True
+
+    def test_ignores_pyi_files_outside_src(self) -> None:
+        assert has_python_changes_index(self._repo("tests/stubs/mod.pyi")) is False
 
     def test_uses_the_given_src_path(self) -> None:
         repo = self._repo("src/pkg/mod.py\nlib/pkg/mod.py")

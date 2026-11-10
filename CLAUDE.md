@@ -16,14 +16,14 @@ Run `task check` before you say that a change is done. It runs these gates:
 The code is in `src/sheridan/diffract/`. `checker.py` connects the steps:
 
 1. Git: `git_utils.py` uses `git archive` to write only the source directory of a ref (or
-   of the staging area) to a temporary directory. It also finds if `.py` files in the source directory changed.
+   of the staging area) to a temporary directory. It also finds if `.py` or `.pyi` files in the source directory changed.
 2. Extract: `git_utils.py` calls `sheridan.iceberg.get_public_api` on each tree to get
    the public names.
 3. Diff: `differ.py` compares the two sets of names and makes an `ApiDiff`.
 4. Classify: `classifier.py` gives the commit type, in this order of priority:
    - a public name was removed: `feat!`
    - a public name was added: `feat`
-   - no name changed, but `.py` files in the source directory changed: `refactor`
+   - no name changed, but `.py` or `.pyi` files in the source directory changed: `refactor`
    - no change: `fix`
 
 Other modules:

@@ -75,17 +75,21 @@ def _read_api(api_root: Path) -> dict[str, list[str]]:
     return surface
 
 
+_PYTHON_SUFFIXES = (".py", ".pyi")
+
+
 def _is_python_in(path: str, src_path: str) -> bool:
-    """Find if ``path`` is a ``.py`` file under ``src_path``.
+    """Find if ``path`` is a ``.py`` or ``.pyi`` file under ``src_path``.
 
     Args:
         path: A path relative to the repository root, as git shows it.
         src_path: The source directory relative to the repository root. ``"."`` is the root.
 
     Returns:
-        ``True`` if ``path`` ends with ``.py`` and is in ``src_path``, ``False`` otherwise.
+        ``True`` if ``path`` ends with ``.py`` or ``.pyi`` and is in ``src_path``, ``False``
+        otherwise.
     """
-    if not path.endswith(".py"):
+    if not path.endswith(_PYTHON_SUFFIXES):
         return False
 
     src_parts = PurePosixPath(src_path).parts
@@ -193,9 +197,9 @@ def get_api_at_ref(repo: Repo, ref: str, src_path: str = "src") -> dict[str, lis
 
 
 def has_python_changes(repo: Repo, base_ref: str, head_ref: str, src_path: str = "src") -> bool:
-    """Check if any ``.py`` files under ``src_path`` differ between base_ref and head_ref.
+    """Check if any ``.py`` or ``.pyi`` files under ``src_path`` differ between base_ref and head_ref.
 
-    A ``.py`` file outside ``src_path`` (for example in ``tests/``) is not package code,
+    A ``.py`` or ``.pyi`` file outside ``src_path`` (for example in ``tests/``) is not package code,
     thus it does not count. A renamed file counts if its old path or its new path is in
     ``src_path``.
 
@@ -206,8 +210,8 @@ def has_python_changes(repo: Repo, base_ref: str, head_ref: str, src_path: str =
         src_path: Relative path within the repo that contains Python packages.
 
     Returns:
-        ``True`` if at least one ``.py`` file under ``src_path`` appears in the diff,
-        ``False`` otherwise.
+        ``True`` if at least one ``.py`` or ``.pyi`` file under ``src_path`` appears in
+        the diff, ``False`` otherwise.
     """
     base_commit = repo.commit(base_ref)
     head_commit = repo.commit(head_ref)
@@ -261,11 +265,11 @@ def get_api_at_index(repo: Repo, src_path: str = "src") -> dict[str, list[str]] 
 
 
 def has_python_changes_index(repo: Repo, src_path: str = "src") -> bool:
-    """Check if any ``.py`` files under ``src_path`` differ between HEAD and the staging area.
+    """Check if any ``.py`` or ``.pyi`` files under ``src_path`` differ between HEAD and the index.
 
     Compares the current HEAD commit against the git index (staging area) with
     ``git diff --cached``, which obeys ``GIT_INDEX_FILE`` (see ``get_api_at_index``).
-    A ``.py`` file outside ``src_path`` does not count. If the repository has no HEAD
+    A ``.py`` or ``.pyi`` file outside ``src_path`` does not count. If the repository has no HEAD
     commit (initial commit edge case), returns ``True`` to conservatively assume changes
     exist.
 
@@ -274,8 +278,8 @@ def has_python_changes_index(repo: Repo, src_path: str = "src") -> bool:
         src_path: Relative path within the repo that contains Python packages.
 
     Returns:
-        ``True`` if at least one ``.py`` file under ``src_path`` appears in the diff
-        between HEAD and the index, or if no HEAD commit exists. ``False`` otherwise.
+        ``True`` if at least one ``.py`` or ``.pyi`` file under ``src_path`` appears in
+        the diff between HEAD and the index, or if no HEAD commit exists. ``False`` otherwise.
     """
     if not repo.head.is_valid():
         return True
