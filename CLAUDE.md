@@ -16,6 +16,8 @@ task typecheck      # mypy --strict src/
 task test           # pytest --cov (coverage ≥ 90% required)
 task install        # uv sync (dev + test dependency groups)
 task lock:check     # uv lock --check (uv.lock is up to date)
+task security:check # bandit -r src/
+task docs:build     # build the Zensical docs
 ```
 
 ## Architecture
@@ -96,6 +98,9 @@ chore:    maintenance (deps, config, tooling)
 ## GitHub Actions workflows
 
 Workflow files live in `.github/workflows/` and use the **`.yaml` extension** (not `.yml`).
+
+`ci.yaml` has one "All gates" job: it runs `uv sync --locked`, then each gate as a `task` step
+(lock, lint, format, typecheck, test, security, docs). Each gate runs after a failed gate too.
 
 ## Architecture Decision Records
 

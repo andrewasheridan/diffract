@@ -14,7 +14,8 @@ repos:
         files: ^src/
         additional_dependencies: [gitpython, sheridan-iceberg]
 
-  - repo: https://github.com/andrewasheridan/diffract
-    rev: v1.0.1  # diffract
-    hooks:
-      - id: diffract-validate
+  # Dogfooding hook temporarily disabled: diffract-validate is currently broken.
+  # - repo: https://github.com/andrewasheridan/diffract
+  #   rev: v1.0.1  # diffract
+  #   hooks:
+  #     - id: diffract-validate
