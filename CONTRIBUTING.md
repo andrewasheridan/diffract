@@ -20,7 +20,7 @@ pre-commit install
 ## Running checks
 
 ```bash
-task check        # all gates: lint, format, typecheck, test
+task check        # all gates: lint, format, typecheck, test, sdist
 task lint         # ruff check + autofix
 task format       # ruff format
 task typecheck    # mypy --strict
@@ -67,7 +67,8 @@ task format:check
 task typecheck
 task test
 task security:check
+task sdist:check
 task docs:build
 ```
 
-`task check` runs lint, format, typecheck and test.
+`task check` runs lint, format, typecheck, test and the sdist check.
