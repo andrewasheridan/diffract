@@ -154,3 +154,4 @@ version_files = [
 ]
 tag_format = "v$version"
 pre_bump_hooks = ["uv lock", "git add uv.lock"]
+update_changelog_on_bump = true

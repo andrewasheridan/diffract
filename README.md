@@ -1,5 +1,10 @@
 # sheridan-diffract
 
+[![CI](https://github.com/andrewasheridan/diffract/actions/workflows/ci.yaml/badge.svg)](https://github.com/andrewasheridan/diffract/actions/workflows/ci.yaml)
+[![PyPI](https://img.shields.io/pypi/v/sheridan-diffract)](https://pypi.org/project/sheridan-diffract/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.14+](https://img.shields.io/badge/python-3.14+-blue.svg)](https://www.python.org/downloads/)
+
 **diffract finds how the public API of a Python package changed between two git commits. It gives the Conventional Commit types that are possible for that change.**
 
 Most semver tools accept the commit type that the developer writes. `diffract` compares that type with the real change to the API. For example, it finds a commit with the type `fix:` that removed a public function.
