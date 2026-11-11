@@ -1,8 +1,8 @@
 """Tests for sheridan.diffract._classifier."""
 
 from sheridan.diffract._classifier import classify
-from sheridan.diffract._enums import CommitType
-from sheridan.diffract._models import ApiDiff, SignatureChange
+from sheridan.diffract._enums import ChangeKind, CommitType
+from sheridan.diffract._models import ApiDiff, NameChange, SignatureChange
 
 
 class TestClassify:
@@ -134,3 +134,33 @@ class TestSignatureChangeSummary:
 
 def _change(name: str, detail: str, *, breaking: bool) -> SignatureChange:
     return SignatureChange(module="pkg", name=name, detail=detail, is_breaking=breaking)
+
+
+class TestSummaryFormat:
+    """Tests for the exact text of the summary when it has many modules and names."""
+
+    def test_names_are_grouped_by_module(self) -> None:
+        """The names of one module must be split by commas, and the modules by semicolons."""
+        removed = tuple(
+            NameChange(module=module, name=name, kind=ChangeKind.removed)
+            for module, name in [("pkg.b", "z"), ("pkg.a", "y"), ("pkg.a", "x")]
+        )
+
+        _, summary = classify(ApiDiff(added=(), removed=removed), code_changed=False, tests_changed=False)
+
+        assert summary == "Breaking change. Removed public names: pkg.a: x, y; pkg.b: z"
+
+    def test_changes_are_grouped_by_module(self) -> None:
+        """Only the first colon of a change must become a parenthesis, because the detail can have a colon."""
+        changed = (
+            SignatureChange(module="pkg.a", name="f", detail="base 'x: y' was added", is_breaking=False),
+            SignatureChange(module="pkg.a", name="g", detail="*args was added", is_breaking=False),
+            SignatureChange(module="pkg.b", name="h", detail="**kwargs was added", is_breaking=False),
+        )
+
+        _, summary = classify(ApiDiff(added=(), removed=(), changed=changed), code_changed=False, tests_changed=False)
+
+        assert summary == (
+            "Changes that add to public names: "
+            "pkg.a: f (base 'x: y' was added), g (*args was added); pkg.b: h (**kwargs was added)"
+        )

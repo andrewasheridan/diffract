@@ -57,6 +57,32 @@ class TestCheck:
 
         mock_get_repo.assert_called_once_with(Path.cwd())
 
+    def test_uses_the_given_repo_path(self, empty_diff: ApiDiff, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
+        """check() must give repo_path to get_repo, not the current directory."""
+        mock_get_repo = mocker.patch("sheridan.diffract._checker.get_repo")
+        mocker.patch("sheridan.diffract._checker.get_api_at_ref", return_value={})
+        mocker.patch("sheridan.diffract._checker.get_changed_paths", return_value=[])
+        mocker.patch("sheridan.diffract._checker.diff_surfaces", return_value=empty_diff)
+        mocker.patch("sheridan.diffract._checker.classify", return_value=(CommitType.other, "ok"))
+
+        check(repo_path=Path("/elsewhere"))
+
+        mock_get_repo.assert_called_once_with(Path("/elsewhere"))
+
+    def test_default_refs(self, empty_diff: ApiDiff, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
+        """check() must compare HEAD~1 with HEAD if there are no refs."""
+        repo = mocker.patch("sheridan.diffract._checker.get_repo").return_value
+        mock_get_api = mocker.patch("sheridan.diffract._checker.get_api_at_ref", return_value={})
+        mock_changed = mocker.patch("sheridan.diffract._checker.get_changed_paths", return_value=[])
+        mocker.patch("sheridan.diffract._checker.diff_surfaces", return_value=empty_diff)
+        mocker.patch("sheridan.diffract._checker.classify", return_value=(CommitType.other, "ok"))
+
+        result = check(repo_path=Path("/tmp"))
+
+        assert [c.args for c in mock_get_api.call_args_list] == [(repo, "HEAD~1"), (repo, "HEAD")]
+        mock_changed.assert_called_once_with(repo, "HEAD~1", "HEAD")
+        assert (result.base_ref, result.head_ref) == ("HEAD~1", "HEAD")
+
     def test_propagates_git_error_from_get_repo(self, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
         """check() must not stop a GitError from get_repo."""
         mocker.patch("sheridan.diffract._checker.get_repo", side_effect=GitError("no repo"))
@@ -185,6 +211,23 @@ class TestCheckStaged:
 
         mock_get_repo.assert_called_once_with(Path.cwd())
 
+    def test_uses_the_given_repo_path(
+        self,
+        empty_diff: ApiDiff,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        """check_staged() must give repo_path to get_repo, not the current directory."""
+        mock_get_repo = mocker.patch("sheridan.diffract._checker.get_repo")
+        mocker.patch("sheridan.diffract._checker.get_api_at_ref", return_value={})
+        mocker.patch("sheridan.diffract._checker.get_api_at_index", return_value={})
+        mocker.patch("sheridan.diffract._checker.get_changed_paths_index", return_value=[])
+        mocker.patch("sheridan.diffract._checker.diff_surfaces", return_value=empty_diff)
+        mocker.patch("sheridan.diffract._checker.classify", return_value=(CommitType.other, "ok"))
+
+        check_staged(repo_path=Path("/elsewhere"))
+
+        mock_get_repo.assert_called_once_with(Path("/elsewhere"))
+
     def test_propagates_git_error_from_get_repo(
         self,
         mocker: pytest.fixture,  # type: ignore[type-arg]
@@ -210,6 +253,24 @@ class TestCheckStaged:
 
         _, kwargs = mock_index.call_args
         assert kwargs["src_path"] == "lib"
+
+    def test_passes_src_path_to_get_api_at_ref(
+        self,
+        empty_diff: ApiDiff,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        """check_staged() must read src_path at HEAD, not the default directory."""
+        repo = mocker.patch("sheridan.diffract._checker.get_repo").return_value
+        repo.head.is_valid.return_value = True
+        mock_get_api = mocker.patch("sheridan.diffract._checker.get_api_at_ref", return_value={})
+        mocker.patch("sheridan.diffract._checker.get_api_at_index", return_value={})
+        mocker.patch("sheridan.diffract._checker.get_changed_paths_index", return_value=[])
+        mocker.patch("sheridan.diffract._checker.diff_surfaces", return_value=empty_diff)
+        mocker.patch("sheridan.diffract._checker.classify", return_value=(CommitType.other, "ok"))
+
+        check_staged(repo_path=Path("/tmp"), src_path="lib")
+
+        mock_get_api.assert_called_once_with(repo, "HEAD", src_path="lib")
 
 
 class TestChangedFiles:
@@ -313,8 +374,14 @@ class TestMissingSourceDirectory:
         self._patch(mocker)
         mocker.patch("sheridan.diffract._checker.get_api_at_ref", return_value=None)
 
-        with pytest.raises(SurfaceError, match="'lib' does not exist at v1 or at v2"):
+        with pytest.raises(SurfaceError) as exc_info:
             check(base_ref="v1", head_ref="v2", repo_path=Path("/tmp"), src_path="lib")
+
+        assert str(exc_info.value) == (
+            "The source directory 'lib' does not exist at v1 or at v2. "
+            "Set the correct directory with --src or in the config file. "
+            "To read the repository root, use --src ."
+        )
 
     def test_staged_missing_at_head_and_index_raises(self, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
         """The commit-msg hook mode also fails if the directory is missing at HEAD and in the index."""

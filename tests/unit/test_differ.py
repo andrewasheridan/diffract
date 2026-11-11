@@ -236,6 +236,23 @@ class TestFunctionChanges:
         head = _func(positional=(Parameter(name="a", annotation="str", default=None),))
         assert _changes(base, head) == []
 
+    def test_property_parameters_are_not_compared(self) -> None:
+        base = _func(positional=(_param("self"),), kind="property")
+        head = _func(positional=(_param("self"), _param("x")), kind="property")
+        assert _changes(base, head) == []
+
+    def test_each_positional_parameter_is_compared(self) -> None:
+        """A change to one parameter must not stop the comparison of the parameters after it."""
+        base = _func(positional=(_param("a"), _param("b"), _param("c", "1")))
+        head = _func(positional=(_param("c"), _param("d", "2")), keyword=(_param("a"),))
+        assert _changes(base, head) == [
+            ("f", "parameter 'a' is keyword-only now", True),
+            ("f", "parameter 'b' was removed", True),
+            ("f", "parameter 'c' moved from position 2 to 0", True),
+            ("f", "parameter 'c' has no default value now", True),
+            ("f", "optional parameter 'd' was added", False),
+        ]
+
 
 class TestClassChanges:
     """Tests for the comparison of a class that is in base and in head."""

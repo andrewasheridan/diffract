@@ -44,8 +44,46 @@ def _container(root: Path) -> Package:
     return Package(name=root.name, path=root, modules=(), subpackages=(mypackage,))
 
 
+@pytest.fixture()
+def git_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Repo:
+    """Make an empty git repository in ``tmp_path``. The git configuration of the user has no effect."""
+    for key in [key for key in os.environ if key.startswith("GIT_")]:
+        monkeypatch.delenv(key)
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
+    for role in ("AUTHOR", "COMMITTER"):
+        monkeypatch.setenv(f"GIT_{role}_NAME", "Test")
+        monkeypatch.setenv(f"GIT_{role}_EMAIL", "test@example.com")
+
+    return Repo.init(tmp_path, initial_branch="main")
+
+
+def _commit(repo: Repo, files: dict[str, str]) -> None:
+    """Write the files to the work tree, then commit them."""
+    root = Path(repo.working_dir)
+    for relative, text in files.items():
+        target = root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding="utf-8")
+    repo.git.add("--all")
+    repo.git.commit("--quiet", "--no-verify", "--no-gpg-sign", "-m", "chore: x")
+
+
 class TestGetRepo:
     """Tests for get_repo()."""
+
+    def test_finds_the_repository_from_a_subdirectory(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        git_repo: Repo,
+    ) -> None:
+        """get_repo must search from path, not from the current directory, and also in the parent directories."""
+        subdirectory = tmp_path / "pkg" / "sub"
+        subdirectory.mkdir(parents=True)
+        monkeypatch.chdir(tmp_path.parent)
+
+        assert Path(get_repo(subdirectory).working_dir).resolve() == tmp_path.resolve()
 
     def test_raises_git_error_when_no_repo(self, tmp_path: Path, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
         """get_repo must raise GitError if no git repository exists at path."""
@@ -74,6 +112,12 @@ class TestHasPythonChanges:
 
     def test_returns_false_when_only_non_py_files_changed(self) -> None:
         assert has_python_changes(["src/pkg/data.json", "README.md"], "src") is False
+
+    def test_finds_a_py_file_after_a_file_that_is_not_python(self) -> None:
+        assert has_python_changes(["README.md", "src/pkg/mod.py"], "src")
+
+    def test_finds_a_py_file_after_a_file_in_the_excluded_directory(self) -> None:
+        assert has_python_changes(["src/pkg/tests/test_mod.py", "src/pkg/mod.py"], "src", exclude="src/pkg/tests")
 
     def test_returns_false_when_no_path_changed(self) -> None:
         assert has_python_changes([], "src") is False
@@ -461,19 +505,9 @@ class TestStagingAreaInARealRepository:
         self,
         tmp_path: Path,
         monkeypatch: pytest.MonkeyPatch,
+        git_repo: Repo,
     ) -> None:
-        for key in [key for key in os.environ if key.startswith("GIT_")]:
-            monkeypatch.delenv(key)
-        monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
-        monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
-        for role in ("AUTHOR", "COMMITTER"):
-            monkeypatch.setenv(f"GIT_{role}_NAME", "Test")
-            monkeypatch.setenv(f"GIT_{role}_EMAIL", "test@example.com")
-
-        repo = Repo.init(tmp_path, initial_branch="main")
-        (tmp_path / "README.md").write_text("# pkg\n", encoding="utf-8")
-        repo.git.add("README.md")
-        repo.git.commit("--quiet", "--no-verify", "--no-gpg-sign", "-m", "docs: x")
+        _commit(git_repo, {"README.md": "# pkg\n"})
         index = tmp_path / ".git" / "index"
         staged = index.read_bytes()
 
@@ -481,11 +515,34 @@ class TestStagingAreaInARealRepository:
         temporary_index = tmp_path / "temporary-index"
         shutil.copyfile(index, temporary_index)
         monkeypatch.setenv("GIT_INDEX_FILE", str(temporary_index))
-        repo.git.add("mod.py")
+        git_repo.git.add("mod.py")
 
-        assert get_changed_paths_index(repo) == ["mod.py"]
-        assert public_names(_known(get_api_at_index(repo, src_path="."))) == {"mod": ["alpha"]}
+        assert get_changed_paths_index(git_repo) == ["mod.py"]
+        assert public_names(_known(get_api_at_index(git_repo, src_path="."))) == {"mod": ["alpha"]}
         assert index.read_bytes() == staged
+
+
+class TestRealRepository:
+    """Tests for the functions that read the commits of a real repository."""
+
+    def test_changed_paths_compare_the_two_refs_and_not_the_work_tree(self, git_repo: Repo) -> None:
+        _commit(git_repo, {"README.md": "# pkg\n"})
+        _commit(git_repo, {"a.py": "A = 1\n"})
+        _commit(git_repo, {"b.py": "B = 2\n"})
+
+        # For an added file, GitPython gives the same a_path and b_path.
+        assert get_changed_paths(git_repo, "HEAD~2", "HEAD~1") == ["a.py", "a.py"]
+
+    def test_api_at_ref_is_none_when_src_path_is_not_in_the_tree(self, git_repo: Repo) -> None:
+        _commit(git_repo, {"src/pkg/__init__.py": "A = 1\n"})
+
+        assert get_api_at_ref(git_repo, "HEAD", src_path="lib") is None
+
+    def test_api_at_ref_raises_git_error_for_a_bad_ref(self, git_repo: Repo) -> None:
+        _commit(git_repo, {"src/pkg/__init__.py": "A = 1\n"})
+
+        with pytest.raises(GitError, match=r"^The ref does not exist: nope$"):
+            get_api_at_ref(git_repo, "nope")
 
 
 class TestReadApi:
