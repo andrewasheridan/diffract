@@ -138,7 +138,7 @@ The hook also obeys these rules:
 
 - A message with no type, or with a type that is not a Conventional Commit type, fails.
 - A `revert:` message always passes, because a revert can undo any change.
-- The hook does not check the messages that git writes: `Merge …`, `Revert "…"`, `fixup! …` and `squash! …`.
+- The hook does not check the messages that git writes: `Merge …`, `Revert "…"`, `fixup! …`, `amend! …` and `squash! …`.
 - The hook ignores comment lines and the blank lines at the start of the message, as git does. A comment line starts with `#`, or with the value of `core.commentChar`.
 
 A change in behavior does not always change a public name. Thus the hook accepts `feat` and a breaking message for a `code` change.

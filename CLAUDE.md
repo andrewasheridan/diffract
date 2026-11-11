@@ -50,7 +50,7 @@ Other modules:
   `BREAKING CHANGE:` footer. `feat` also accepts a breaking message. `code` accepts
   `fix`, `refactor`, `perf`, `style`, `feat` or a breaking message. `test` needs
   `test`, and `other` needs `docs`, `ci`, `chore` or `build`. A message with no
-  known type fails. Messages that git writes (merge, revert, fixup, squash) and
+  known type fails. Messages that git writes (merge, revert, fixup, amend, squash) and
   `revert:` messages always pass.
 
 diffract does not compare type annotations, decorators or default values, and it does
