@@ -59,3 +59,20 @@ def surface(names: dict[str, list[str]]) -> ApiSurface:
         )
         for module, module_names in names.items()
     }
+
+
+def public_names(api: ApiSurface) -> dict[str, list[str]]:
+    """Collect the public names of each module in an API.
+
+    Args:
+        api: A dict from each module name to its iceberg ``Module``.
+
+    Returns:
+        A dict from each module name to its sorted public names.
+    """
+    return {name: _module_public_names(module) for name, module in sorted(api.items())}
+
+
+def _module_public_names(module: Module) -> list[str]:
+    members = (*module.assignments, *module.classes, *module.functions, *module.references)
+    return sorted({member.name for member in members if member.is_public})

@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 from git import Repo
 
-from sheridan.diffract._differ import ApiSurface, public_names
+from sheridan.diffract._differ import ApiSurface
 from sheridan.diffract._exceptions import GitError, SurfaceError
 from sheridan.diffract._git_utils import (
     get_api_at_index,
@@ -20,6 +20,7 @@ from sheridan.diffract._git_utils import (
     has_python_changes,
 )
 from sheridan.iceberg import Assignment, Module, Package
+from tests.unit.conftest import public_names
 
 
 def _known(api: ApiSurface | None) -> ApiSurface:
