@@ -29,7 +29,7 @@ _CONVENTIONAL_TYPES = frozenset(
     {"feat", "fix", "refactor", "perf", "style", "test", "docs", "ci", "chore", "build", "revert"}
 )
 # git writes these messages itself. diffract does not check them.
-_GIT_MESSAGE_PREFIXES = ("Merge ", 'Revert "', "fixup! ", "squash! ")
+_GIT_MESSAGE_PREFIXES = ("Merge ", 'Revert "', "fixup! ", "amend! ", "squash! ")
 # A change in behavior does not always change a public name. Thus feat is also
 # possible when diffract finds only a code change.
 _ALLOWED_TYPES: dict[CommitType, frozenset[str]] = {
@@ -154,7 +154,7 @@ def _build_parser() -> argparse.ArgumentParser:
             "'BREAKING CHANGE:' footer. Added public names need 'feat' or a '!'. Code changes need "
             "fix, refactor, perf, style, feat or a '!'. Test changes need test. Other changes need "
             "docs, ci, chore or build. A message with no known type fails. diffract does not check "
-            "merge, revert, fixup and squash messages from git."
+            "merge, revert, fixup, amend and squash messages from git."
         ),
     )
 
@@ -302,7 +302,7 @@ def _parse_written_type(message: str) -> _WrittenType | None:
 
 
 def _is_written_by_git(message: str) -> bool:
-    """Find if git wrote the commit message, for a merge, a revert, a fixup or a squash.
+    """Find if git wrote the commit message, for a merge, a revert, a fixup, an amend or a squash.
 
     Args:
         message: The full commit message.

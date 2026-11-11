@@ -50,7 +50,7 @@ _MSG_FILE_HELP = (
     "'BREAKING CHANGE:' footer. Added public names need 'feat' or a '!'. Code changes need "
     "fix, refactor, perf, style, feat or a '!'. Test changes need test. Other changes need "
     "docs, ci, chore or build. A message with no known type fails. diffract does not check "
-    "merge, revert, fixup and squash messages from git."
+    "merge, revert, fixup, amend and squash messages from git."
 )
 
 # One row for each argument: (option strings, dest, nargs, default, metavar, help, action class).
@@ -687,6 +687,7 @@ class TestIsWrittenByGit:
             'Revert "feat: add thing"\n\nThis reverts commit abc.',
             "fixup! fix: correct bug",
             "squash! feat: add thing",
+            "amend! chore: x",
         ],
     )
     def test_git_messages(self, message: str) -> None:
@@ -1122,6 +1123,7 @@ class TestValidateMsgFile:
             'Revert "feat: add thing"\n\nThis reverts commit abc.\n',
             "fixup! fix: correct bug\n",
             "squash! feat: add thing\n",
+            "amend! chore: x\n",
         ],
     )
     def test_git_message_exits_zero(
