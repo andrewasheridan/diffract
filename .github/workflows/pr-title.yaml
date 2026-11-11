@@ -5,9 +5,9 @@
 # the pull request: it reads the title through the API and nothing else.
 # Only pull-requests: read is needed — no write access required.
 #
-# Checks that need the pull request's code (such as validating the title against
-# diffract's detected API change) belong in a `pull_request` job in ci.yaml,
-# which gets a read-only token and no secrets.
+# pr-title-diffract.yaml compares the title with the API change. That check runs the
+# code of the pull request, thus it uses pull_request, with a read-only token and no
+# secrets.
 
 name: PR title
 

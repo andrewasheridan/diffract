@@ -109,7 +109,9 @@ Rules:
    ```
 
 - Title: the same format as a commit header. The squash merge uses this title as the
-  commit on `main`. The `pr-title` workflow checks it.
+  commit on `main`. The `pr-title` workflow checks the format. The
+  `pr-title-diffract` workflow uses diffract to check that the type is possible for
+  the change, with the same rules as the `diffract-validate` hook.
 - Labels: the same `type:` and `priority:` labels as the issue.
 - Body: fill in `.github/pull_request_template.md`. The first line is
   `Closes #<issue>`. Write the summary in STE.
