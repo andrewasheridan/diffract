@@ -34,7 +34,7 @@ jobs:
 
 - For a `pull_request` event, `actions/checkout` gets the test merge commit of the pull request. `HEAD^1`, its first parent, is the `HEAD` of the target branch. The diff between the two is the change of the pull request only.
 - Do not compare `pull_request.base.sha` with `pull_request.head.sha`. diffract compares the two trees. If the target branch moved after the branch point, the diff also contains the newer changes on the target branch, in reverse. For example, a name that a different pull request added shows as a removed name.
-- The check uses the same rules as the [commit-msg hook](commit-msg-hook.md). The title type must be possible for all the changes in the pull request. For example, if the pull request changes code and tests, `test:` fails.
+- The check uses the same rules as the [commit-msg hook](commit-msg-hook.md). The title type must tell enough about all the changes in the pull request. For example, if the pull request adds a public name and removes a different public name, `feat:` fails and `feat!:` passes.
 - The check keeps the scope. If the title is `fix(parser): …` and diffract finds an added name, the message shows `feat(parser):`.
 
 Do not put `${{ github.event.pull_request.title }}` directly in the `run` script. A

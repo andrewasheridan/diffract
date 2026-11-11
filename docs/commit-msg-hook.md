@@ -2,7 +2,7 @@
 
 diffract has a `commit-msg` hook for [pre-commit](https://pre-commit.com) and
 [prek](https://github.com/j178/prek). The hook rejects a commit message if the commit
-type is not possible for the change.
+type tells less than the change to the public API.
 
 ## Install the hook
 
@@ -32,9 +32,7 @@ arguments. Read [Configuration](configuration.md).
 |---|---|
 | A public name was removed or had a breaking change (`feat!`) | Any type with a `!` or a `BREAKING CHANGE:` footer |
 | A public name was added or had a change that adds to it (`feat`) | `feat`, or any type with a `!` or a `BREAKING CHANGE:` footer |
-| Python files in the source directory changed (`code`) | `fix`, `refactor`, `perf`, `style` or `feat`, or any type with a `!` or a `BREAKING CHANGE:` footer |
-| Only Python files in the test directory changed (`test`) | `test` |
-| All other changes (`other`) | `docs`, `ci`, `chore` or `build` |
+| No public name changed (`code`, `test` or `other`) | Any Conventional Commit type |
 
 The hook also obeys these rules:
 
@@ -43,7 +41,9 @@ The hook also obeys these rules:
 - The hook does not check the messages that git writes: `Merge …`, `Revert "…"`, `fixup! …`, `amend! …` and `squash! …`.
 - The hook ignores comment lines and the blank lines at the start of the message, as git does. A comment line starts with `#`, or with the value of `core.commentChar`.
 
-A change in behavior does not always change a public name. Thus the hook accepts `feat` and a breaking message for a `code` change.
+diffract compares only the public API. If no public name changed, diffract cannot tell a fix from a docs change. Thus the hook accepts each type.
+
+If the type is `feat` and no public name changed, the hook writes a warning to stderr. The commit continues, because a change in behavior can be a feature also when no public name changes.
 
 ## What the hook compares
 
@@ -54,7 +54,7 @@ last commit, and the staging area has the content of the new commit.
 
 ## Output
 
-If the commit type is not possible for the change, the hook writes the change, the
+If the commit type tells less than the API change, the hook writes the change, the
 written type and the possible types to stderr. Then it exits with code 1. The written
 type keeps the scope of your message. For example, `fix(parser): …` for a change that
 adds a public name gives:

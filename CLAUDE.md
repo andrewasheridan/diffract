@@ -31,7 +31,7 @@ The code is in `src/sheridan/diffract/`. `_checker.py` connects the steps:
    - a public name was removed, or had a breaking change: `feat!`
    - a public name was added, or had a change that adds to it: `feat`
    - `.py` or `.pyi` files in the source directory changed: `code` (`fix`, `refactor`,
-     `perf`, `style`)
+     `perf`, `style`, `docs`)
    - `.py` or `.pyi` files in the test directory changed: `test`
    - all other changes: `other` (`docs`, `ci`, `chore`, `build`)
 
@@ -46,10 +46,10 @@ Other modules:
   `pyproject.toml`. The `--src` and `--tests` flags have priority over both files.
 - `_cli.py`: the `diffract` command. With `--validate-msg-file` and no refs, it compares
   `HEAD` with the staging area. This is the `commit-msg` hook mode. The check fails
-  if the written type is not possible for the result. `feat!` needs a `!` or a
-  `BREAKING CHANGE:` footer. `feat` also accepts a breaking message. `code` accepts
-  `fix`, `refactor`, `perf`, `style`, `feat` or a breaking message. `test` needs
-  `test`, and `other` needs `docs`, `ci`, `chore` or `build`. A message with no
+  if the written type tells less than the API change. `feat!` needs a `!` or a
+  `BREAKING CHANGE:` footer. `feat` needs `feat` or a breaking message. For `code`,
+  `test` and `other`, each known type passes, because diffract cannot tell a fix
+  from a docs change. `feat` with no API change gives a warning. A message with no
   known type fails. Messages that git writes (merge, revert, fixup, amend, squash) and
   `revert:` messages always pass.
 

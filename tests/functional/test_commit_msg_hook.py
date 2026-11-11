@@ -69,7 +69,6 @@ def test_hook_accepts_a_possible_type_or_a_git_message(hooked: GitRepo, message:
         pytest.param(
             INITIAL_PACKAGE.replace('"beta"]', '"beta", "gamma"]') + "gamma = 3\n", "feat: x", "fix: x", id="added"
         ),
-        pytest.param(INITIAL_PACKAGE + "\n\ndef _helper() -> None:\n    pass\n", "fix: x", "docs: x", id="code"),
         pytest.param(
             INITIAL_PACKAGE.replace("def beta()", "def beta(scale: int)"), "feat!: x", "fix: x", id="new-parameter"
         ),
@@ -82,7 +81,7 @@ def test_hook_accepts_a_possible_type_or_a_git_message(hooked: GitRepo, message:
     ],
 )
 def test_hook_checks_each_type(hooked: GitRepo, text: str, good: str, bad: str) -> None:
-    """The hook refuses a type that is not possible, then accepts a possible type for the same staged change."""
+    """The hook refuses a type that tells less than the API change, then accepts a type that tells enough."""
     hooked.write("src/pkg/__init__.py", text)
 
     assert _commit(hooked, bad).returncode != 0
@@ -92,10 +91,21 @@ def test_hook_checks_each_type(hooked: GitRepo, text: str, good: str, bad: str) 
 
 @pytest.mark.parametrize(
     "message",
-    ["fix: x", "feat: x", "feat!: x", "refactor: x", "perf: x", "style: x", "fix: x\n\nBREAKING CHANGE: y"],
+    [
+        "fix: x",
+        "feat: x",
+        "feat!: x",
+        "refactor: x",
+        "perf: x",
+        "style: x",
+        "docs: x",
+        "test: x",
+        "chore: x",
+        "fix: x\n\nBREAKING CHANGE: y",
+    ],
 )
-def test_hook_accepts_each_possible_type_for_an_internal_change(hooked: GitRepo, message: str) -> None:
-    """A change with no name change accepts each type of the code group, feat and a breaking message."""
+def test_hook_accepts_each_type_for_an_internal_change(hooked: GitRepo, message: str) -> None:
+    """A change in the source directory with no name change accepts each known type."""
     hooked.write("src/pkg/__init__.py", INITIAL_PACKAGE + "\n\ndef _helper() -> None:\n    pass\n")
 
     proc = _commit(hooked, message)
@@ -104,20 +114,42 @@ def test_hook_accepts_each_possible_type_for_an_internal_change(hooked: GitRepo,
     assert _head_subject(hooked) == message.splitlines()[0]
 
 
+def test_hook_accepts_docs_for_a_docstring_change(hooked: GitRepo) -> None:
+    """A change to a docstring in the source directory does not change the API. Thus ``docs`` passes."""
+    with_docstring = INITIAL_PACKAGE.replace("def beta() -> int:\n", 'def beta() -> int:\n    """Give two."""\n')
+    hooked.write("src/pkg/__init__.py", with_docstring)
+
+    proc = _commit(hooked, "docs: describe beta")
+
+    assert proc.returncode == 0, proc.stderr
+    assert _head_subject(hooked) == "docs: describe beta"
+
+
 @pytest.mark.parametrize(
-    ("path", "good", "bad"),
+    ("path", "message"),
     [
-        pytest.param("tests/test_pkg.py", "test: x", "fix: x", id="test"),
-        pytest.param("README.md", "docs: x", "test: x", id="other"),
+        pytest.param("tests/test_pkg.py", "fix: x", id="test"),
+        pytest.param("README.md", "test: x", id="other"),
     ],
 )
-def test_hook_checks_the_test_and_other_groups(hooked: GitRepo, path: str, good: str, bad: str) -> None:
-    """A test change needs ``test``, and a change outside Python files needs docs, ci, chore or build."""
+def test_hook_accepts_each_type_for_the_test_and_other_groups(hooked: GitRepo, path: str, message: str) -> None:
+    """diffract cannot tell a test change or a docs change from a different type. Thus each type passes."""
     hooked.write(path, "def test_x() -> None:\n    pass\n")
 
-    assert _commit(hooked, bad).returncode != 0
-    assert _commit(hooked, good).returncode == 0
-    assert _head_subject(hooked) == good
+    proc = _commit(hooked, message)
+
+    assert proc.returncode == 0, proc.stderr
+    assert _head_subject(hooked) == message
+
+
+def test_hook_warns_about_feat_with_no_api_change(hooked: GitRepo) -> None:
+    """``feat`` with no change to a public name passes, but the hook writes a warning."""
+    hooked.write("README.md", "# pkg\n\nDocs.\n")
+
+    proc = _commit(hooked, "feat: x")
+
+    assert proc.returncode == 0, proc.stderr
+    assert "diffract: warning: the type is feat, but no public name changed." in proc.stderr
 
 
 def test_hook_rejects_a_message_with_no_type(hooked: GitRepo) -> None:
@@ -127,7 +159,7 @@ def test_hook_rejects_a_message_with_no_type(hooked: GitRepo) -> None:
     proc = _commit(hooked, "tidy up")
 
     assert proc.returncode != 0
-    assert "written:  (no known type)\n  possible: docs, ci, chore, build" in proc.stderr
+    assert "written:  (no known type)\n  possible: any Conventional Commit type (" in proc.stderr
 
 
 def test_hook_ignores_the_last_commit(hooked: GitRepo) -> None:

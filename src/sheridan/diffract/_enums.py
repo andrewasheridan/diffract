@@ -19,6 +19,8 @@ class CommitType(StrEnum):
         feat_breaking: A public name was removed. This is a breaking change.
         feat: A public name was added, and no public name was removed.
         code: No public name changed, but Python files in the source directory changed.
+            ``docs`` is in this group, because a change to a docstring or a comment
+            changes a Python file but not the public API.
         test: No public name changed, and only Python files in the test directory
             changed.
         other: No public name changed, and no Python file in the source directory or
@@ -40,7 +42,7 @@ class CommitType(StrEnum):
 _POSSIBLE_TYPES: dict[CommitType, tuple[str, ...]] = {
     CommitType.feat_breaking: ("feat!",),
     CommitType.feat: ("feat",),
-    CommitType.code: ("fix", "refactor", "perf", "style"),
+    CommitType.code: ("fix", "refactor", "perf", "style", "docs"),
     CommitType.test: ("test",),
     CommitType.other: ("docs", "ci", "chore", "build"),
 }

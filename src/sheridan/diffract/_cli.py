@@ -30,17 +30,10 @@ _CONVENTIONAL_TYPES = frozenset(
 )
 # git writes these messages itself. diffract does not check them.
 _GIT_MESSAGE_PREFIXES = ("Merge ", 'Revert "', "fixup! ", "amend! ", "squash! ")
-# A change in behavior does not always change a public name. Thus feat is also
-# possible when diffract finds only a code change.
-_ALLOWED_TYPES: dict[CommitType, frozenset[str]] = {
-    CommitType.feat_breaking: frozenset(),
-    CommitType.feat: frozenset({"feat"}),
-    CommitType.code: frozenset({"fix", "refactor", "perf", "style", "feat"}),
-    CommitType.test: frozenset({"test"}),
-    CommitType.other: frozenset({"docs", "ci", "chore", "build"}),
-}
-# For these groups, a breaking message is always correct.
-_BREAKING_ALLOWED = (CommitType.feat_breaking, CommitType.feat, CommitType.code)
+_BREAKING_TYPES_TEXT = "any type with a '!' or a 'BREAKING CHANGE:' footer"
+_FEAT_WARNING = (
+    "diffract: warning: the type is feat, but no public name changed. Make sure that the commit adds a feature."
+)
 
 
 @dataclass(frozen=True)
@@ -149,12 +142,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--validate-msg-file",
         metavar="MSGFILE",
         help=(
-            "The path of a commit message file. The check fails if the commit type is not "
-            "possible for the change. Removed public names and breaking changes need a '!' or a "
-            "'BREAKING CHANGE:' footer. Added public names need 'feat' or a '!'. Code changes need "
-            "fix, refactor, perf, style, feat or a '!'. Test changes need test. Other changes need "
-            "docs, ci, chore or build. A message with no known type fails. diffract does not check "
-            "merge, revert, fixup, amend and squash messages from git."
+            "The path of a commit message file. The check fails if the commit type tells less than "
+            "the change to the public API. Removed public names and breaking changes need a '!' or a "
+            "'BREAKING CHANGE:' footer. Added public names need 'feat' or a '!'. If no public name "
+            "changed, each known type passes. A message with no known type fails. diffract does not "
+            "check merge, revert, fixup, amend and squash messages from git."
         ),
     )
 
@@ -314,8 +306,10 @@ def _is_written_by_git(message: str) -> bool:
 
 
 def _is_allowed(written: _WrittenType, commit_type: CommitType) -> bool:
-    """Find if a written commit type is possible for the result of diffract.
+    """Find if a written commit type tells enough about the change to the public API.
 
+    diffract knows only the public API and the changed files. It cannot tell a fix
+    from a docs change. Thus, if no public name changed, each known type is possible.
     A ``revert`` type is always possible, because a revert can undo any change.
 
     Args:
@@ -323,13 +317,15 @@ def _is_allowed(written: _WrittenType, commit_type: CommitType) -> bool:
         commit_type: The group of possible types that diffract found.
 
     Returns:
-        True if the written type is possible for the result.
+        True if the written type tells enough about the change.
     """
-    if written.base == "revert":
+    if written.base == "revert" or written.breaking:
         return True
-    if written.breaking and commit_type in _BREAKING_ALLOWED:
-        return True
-    return written.base in _ALLOWED_TYPES[commit_type]
+    if commit_type == CommitType.feat_breaking:
+        return False
+    if commit_type == CommitType.feat:
+        return written.base == "feat"
+    return True
 
 
 def _describe_allowed(commit_type: CommitType) -> str:
@@ -339,19 +335,29 @@ def _describe_allowed(commit_type: CommitType) -> str:
         commit_type: The group of possible types that diffract found.
 
     Returns:
-        The possible types, for example ``"fix, refactor, perf, style"``.
+        The possible types, for example ``"feat, or any type with a '!' ..."``.
     """
     if commit_type == CommitType.feat_breaking:
-        return "any type with a '!' or a 'BREAKING CHANGE:' footer"
+        return _BREAKING_TYPES_TEXT
+    if commit_type == CommitType.feat:
+        return f"feat, or {_BREAKING_TYPES_TEXT}"
+    return f"any Conventional Commit type ({', '.join(sorted(_CONVENTIONAL_TYPES))})"
 
-    types = list(commit_type.possible_types)
-    for base in sorted(_ALLOWED_TYPES[commit_type] - set(types)):
-        types.append(base)
-    text = ", ".join(types)
 
-    if commit_type in _BREAKING_ALLOWED:
-        text += ", or any type with a '!' or a 'BREAKING CHANGE:' footer"
-    return text
+def _is_feat_without_api_change(written: _WrittenType, commit_type: CommitType) -> bool:
+    """Find if a message gives ``feat`` but no public name changed.
+
+    A change in behavior can be a feature also when no public name changes. Thus this
+    is a warning, not an error.
+
+    Args:
+        written: The commit type from the message.
+        commit_type: The group of possible types that diffract found.
+
+    Returns:
+        True if the type is ``feat`` without a ``!``, and no public name changed.
+    """
+    return written.base == "feat" and not written.breaking and commit_type not in _FEATURE_TYPES
 
 
 def _format_commit_type(commit_type: CommitType, scope: str | None) -> str:
@@ -389,7 +395,7 @@ def main() -> None:
     The exit codes:
       - 0: No public name changed, or the command has no ``--exit-code`` flag.
       - 1: A public name was removed or had a breaking change (with ``--exit-code``),
-        or the commit type in the commit message is not possible for the change.
+        or the commit type in the commit message tells less than the API change.
       - 2: A public name was added or had a change that only adds to it, and no
         breaking change occurred (with ``--exit-code``).
       - 3: An error. This can be a usage error, a git, file or configuration error, or
@@ -456,19 +462,21 @@ def _run() -> None:
             sys.exit(0)
 
         written = _parse_written_type(message)
-        if written is not None and _is_allowed(written, result.commit_type):
-            sys.exit(0)
+        if written is None or not _is_allowed(written, result.commit_type):
+            scope = written.scope if written is not None else None
+            written_label = written.label if written is not None else "(no known type)"
+            print(_format_human(result, scope=scope), file=sys.stderr)
+            print(
+                f"\ndiffract: commit type mismatch"
+                f"\n  written:  {written_label}"
+                f"\n  possible: {_describe_allowed(result.commit_type)}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
-        scope = written.scope if written is not None else None
-        written_label = written.label if written is not None else "(no known type)"
-        print(_format_human(result, scope=scope), file=sys.stderr)
-        print(
-            f"\ndiffract: commit type mismatch"
-            f"\n  written:  {written_label}"
-            f"\n  possible: {_describe_allowed(result.commit_type)}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        if _is_feat_without_api_change(written, result.commit_type):
+            print(_FEAT_WARNING, file=sys.stderr)
+        sys.exit(0)
 
     if args.output_json:
         print(json.dumps(result.to_dict(), indent=2))

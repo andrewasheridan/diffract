@@ -103,7 +103,7 @@ class TestDiffractResult:
     def test_to_dict_gives_possible_types(self, empty_diff: ApiDiff) -> None:
         """possible_types in to_dict must be a list of the types in the group."""
         result = self._make_result(empty_diff, CommitType.code)
-        assert result.to_dict()["possible_types"] == ["fix", "refactor", "perf", "style"]
+        assert result.to_dict()["possible_types"] == ["fix", "refactor", "perf", "style", "docs"]
 
     def test_to_dict_diff_added_structure(self, addition_diff: ApiDiff) -> None:
         """diff.added in to_dict must be a list of {module, name} dicts."""

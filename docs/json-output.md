@@ -34,7 +34,7 @@ diffract v1.2.0 HEAD --json
 | Key | Type | Description |
 |---|---|---|
 | `group` | string | The group of possible types: `feat!`, `feat`, `code`, `test` or `other`. Read [Getting started](getting-started.md#how-diffract-gives-the-commit-types). |
-| `possible_types` | list | The Conventional Commit types in the group, for example `["fix", "refactor", "perf", "style"]` for `code`. |
+| `possible_types` | list | The Conventional Commit types in the group, for example `["fix", "refactor", "perf", "style", "docs"]` for `code`. |
 | `summary` | string | A description of the change for people. Do not parse it. |
 | `base_ref` | string | The earlier ref, as you gave it. |
 | `head_ref` | string | The later ref, as you gave it. For the staging area, the value is `:staged`. |

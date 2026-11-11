@@ -12,12 +12,11 @@
 - id: diffract-validate
   name: diffract (validate commit message type)
   description: >
-    Checks that the commit type is possible for the change that diffract finds.
-    Removed public names need a '!' or a 'BREAKING CHANGE:' footer. Added
-    public names need 'feat' or a '!'. Code changes need fix, refactor, perf,
-    style, feat or a '!'. Test changes need test. Other changes need docs, ci,
-    chore or build. A message with no known type fails. Merge, revert, fixup
-    and squash messages from git pass. Set the source and test directories in
+    Checks that the commit type tells enough about the change to the public
+    API. Removed public names need a '!' or a 'BREAKING CHANGE:' footer. Added
+    public names need 'feat' or a '!'. If no public name changed, each known
+    type passes. A message with no known type fails. Merge, revert, fixup,
+    amend and squash messages from git pass. Set the source and test directories in
     diffract.toml or pyproject.toml [tool.diffract], not in the hook args.
   language: python
   entry: diffract --validate-msg-file

@@ -32,7 +32,7 @@ class TestCommitType:
         """Each group must give the Conventional Commit types that are possible for it."""
         assert CommitType.feat_breaking.possible_types == ("feat!",)
         assert CommitType.feat.possible_types == ("feat",)
-        assert CommitType.code.possible_types == ("fix", "refactor", "perf", "style")
+        assert CommitType.code.possible_types == ("fix", "refactor", "perf", "style", "docs")
         assert CommitType.test.possible_types == ("test",)
         assert CommitType.other.possible_types == ("docs", "ci", "chore", "build")
 
