@@ -170,6 +170,36 @@ def get_repo(path: Path) -> Repo:
         raise GitError(f"Cannot find a git repository at or above {path}") from exc
 
 
+# With core.commentChar set to "auto", git uses the first of these characters that no
+# line of the message starts with. The hook cannot know which one git used.
+_AUTO_COMMENT_CHARS = ("#", ";", "@", "!", "$", "%", "^", "&", "|", ":")
+
+
+def get_comment_prefixes(repo: Repo) -> tuple[str, ...]:
+    """Find the text at the start of a comment line in a commit message.
+
+    git reads ``core.commentChar`` and ``core.commentString``. If the two are set, the last
+    value that git reads has priority.
+
+    Args:
+        repo: The repository.
+
+    Returns:
+        The comment prefix: ``"#"`` if the value is not set, or each character that git can
+        use if the value is ``"auto"``.
+    """
+    try:
+        output = repo.git.config("--get-regexp", r"^core\.comment(char|string)$")
+    except GitCommandError:  # git exits 1 if no key agrees with the pattern.
+        return ("#",)
+
+    last_line = output.splitlines()[-1]
+    _key, _, value = last_line.partition(" ")
+    if value == "auto":
+        return _AUTO_COMMENT_CHARS
+    return (value,)
+
+
 def get_api_at_ref(repo: Repo, ref: str, src_path: str = "src") -> ApiSurface | None:
     """Extract the public API at a git ref.
 

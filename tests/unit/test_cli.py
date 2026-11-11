@@ -16,6 +16,7 @@ from sheridan.diffract._cli import (
     _is_allowed,
     _is_written_by_git,
     _parse_written_type,
+    _remove_comments,
     _resolve_exit_code,
     _WrittenType,
     main,
@@ -650,6 +651,30 @@ class TestParseWrittenType:
     )
     def test_parse(self, message: str, expected: _WrittenType | None) -> None:
         assert _parse_written_type(message) == expected
+
+
+class TestRemoveComments:
+    """Unit tests for _remove_comments()."""
+
+    @pytest.mark.parametrize(
+        ("message", "prefixes", "expected"),
+        [
+            ("chore: x", ("#",), "chore: x"),
+            ("# type(scope): subject\nchore: x", ("#",), "chore: x"),
+            ("\n\n  \nchore: x\n\nbody", ("#",), "chore: x\n\nbody"),
+            ("# a\n\n# b\nchore: x\n# c\nbody", ("#",), "chore: x\nbody"),
+            ("; a\n# b\nchore: x", (";",), "# b\nchore: x"),
+            ("; a\n# b\nchore: x", ("#", ";"), "chore: x"),
+            ("// a\n/ b", ("//",), "/ b"),
+            ("# only a comment\n", ("#",), ""),
+        ],
+    )
+    def test_remove(self, message: str, prefixes: tuple[str, ...], expected: str) -> None:
+        assert _remove_comments(message, prefixes) == expected
+
+    def test_breaking_footer_in_a_comment_line_is_not_breaking(self) -> None:
+        message = _remove_comments("# BREAKING CHANGE: y\nfix: x\n\n; BREAKING CHANGE: y", ("#", ";"))
+        assert _parse_written_type(message) == _WrittenType("fix", None, breaking=False)
 
 
 class TestIsWrittenByGit:

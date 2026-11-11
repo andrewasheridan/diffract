@@ -16,7 +16,7 @@ from sheridan.diffract._classifier import group_by_module, group_changes_by_modu
 from sheridan.diffract._config import load_config
 from sheridan.diffract._enums import CommitType
 from sheridan.diffract._exceptions import DiffractError
-from sheridan.diffract._git_utils import get_repo
+from sheridan.diffract._git_utils import get_comment_prefixes, get_repo
 from sheridan.diffract._models import DiffractResult
 
 _COMMIT_TYPE_RE: re.Pattern[str] = re.compile(r"^([a-z]+)(\(([^)]*)\))?(!)?:")
@@ -257,6 +257,24 @@ def _resolve_exit_code(result: DiffractResult, use_exit_code: bool) -> int:
     return 0
 
 
+def _remove_comments(message: str, comment_prefixes: tuple[str, ...]) -> str:
+    """Remove the comment lines and the blank lines at the start of a commit message.
+
+    git gives the ``commit-msg`` hook the message file before it removes these lines.
+
+    Args:
+        message: The full commit message, as git wrote it to the message file.
+        comment_prefixes: The texts at the start of a comment line.
+
+    Returns:
+        The message without its comment lines, which starts at its first line that is not blank.
+    """
+    lines = [line for line in message.splitlines() if not line.startswith(comment_prefixes)]
+    while lines and not lines[0].strip():
+        lines.pop(0)
+    return "\n".join(lines)
+
+
 def _parse_written_type(message: str) -> _WrittenType | None:
     """Parse the Conventional Commit type from a commit message.
 
@@ -396,8 +414,10 @@ def _run() -> None:
     repo_path = Path.cwd()
     # Find the root of the repository. Thus load_config finds the configuration files
     # also when you start diffract in a subdirectory.
+    repo = None
     try:
-        repo_root = Path(get_repo(repo_path).working_dir)
+        repo = get_repo(repo_path)
+        repo_root = Path(repo.working_dir)
     except DiffractError:
         repo_root = repo_path  # No repository. check() will raise the correct error.
 
@@ -430,10 +450,12 @@ def _run() -> None:
             print(f"diffract: cannot read the commit message file: {exc}", file=sys.stderr)
             sys.exit(_ERROR_EXIT_CODE)
 
-        if _is_written_by_git(raw):
+        comment_prefixes = get_comment_prefixes(repo) if repo is not None else ("#",)
+        message = _remove_comments(raw, comment_prefixes)
+        if _is_written_by_git(message):
             sys.exit(0)
 
-        written = _parse_written_type(raw)
+        written = _parse_written_type(message)
         if written is not None and _is_allowed(written, result.commit_type):
             sys.exit(0)
 
