@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from sheridan.diffract._differ import diff_surfaces, public_names
+from sheridan.diffract._differ import diff_surfaces
 from sheridan.diffract._enums import ChangeKind
 from sheridan.diffract._models import ApiDiff
 from sheridan.iceberg import Assignment, Class, Function, Module, Parameter, Reference
@@ -144,14 +144,6 @@ class TestDiffSurfaces:
         diff = _names_diff({"m": ["A"]}, {"m": ["A", "B"]})
         assert isinstance(diff.added, tuple)
         assert isinstance(diff.removed, tuple)
-
-
-class TestPublicNames:
-    """Tests for public_names()."""
-
-    def test_gives_the_sorted_public_names_of_each_module(self) -> None:
-        api = _module(_func("b"), _class("A"), Assignment(name="_private", annotation=None))
-        assert public_names(api) == {"pkg": ["A", "b"]}
 
 
 class TestFunctionChanges:

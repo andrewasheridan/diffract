@@ -1,6 +1,6 @@
 """Compare the public API at two refs."""
 
-__all__ = ["ApiSurface", "diff_surfaces", "public_names"]
+__all__ = ["ApiSurface", "diff_surfaces"]
 
 from collections.abc import Iterable
 
@@ -69,18 +69,6 @@ def _module_members(module: Module) -> dict[str, _Member]:
 def _class_members(cls: Class) -> dict[str, _Member]:
     """Map each public name in a class body to its member."""
     return _public_members((*cls.assignments, *cls.methods, *cls.nested_classes))
-
-
-def public_names(surface: ApiSurface) -> dict[str, list[str]]:
-    """Collect the public names of each module in an API.
-
-    Args:
-        surface: The API, as a dict from each module name to its ``Module``.
-
-    Returns:
-        A dict from each module name to its sorted public names.
-    """
-    return {name: sorted(_module_members(module)) for name, module in sorted(surface.items())}
 
 
 def _diff_members(builder: _DiffBuilder, prefix: str, base: dict[str, _Member], head: dict[str, _Member]) -> None:
