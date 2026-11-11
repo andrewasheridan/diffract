@@ -1,0 +1,42 @@
+# Make sure that the type in the pull request title is possible for the API change.
+#
+# The squash merge uses the title as the commit header on main, and cz bump reads that
+# header. Thus the title gets the same check as the commit-msg hook.
+#
+# This workflow uses pull_request, not pull_request_target, because it runs the code of
+# the pull request. The token is read-only and the job gets no secrets.
+#
+# The default checkout of a pull_request event is the test merge commit. Its first
+# parent is the tip of the target branch. The diff between the two is the change that
+# the squash merge will put on main, also when the target branch moved after the branch
+# point.
+
+name: PR title (diffract)
+
+on:
+  pull_request:
+    # 'edited' runs the check again when only the title changes.
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  diffract-pr-title:
+    name: Check PR title with diffract
+    runs-on: ubuntu-latest
+    if: "!startsWith(github.event.pull_request.head.ref, 'chore/version-bump-')"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 2
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+
+      # Do not put the title directly in the script. A title can contain shell commands.
+      - name: Check that the PR title type is possible for the change
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          printf '%s' "$PR_TITLE" > "$RUNNER_TEMP/pr-title.txt"
+          uv run --locked --no-default-groups diffract HEAD^1 HEAD \
+            --validate-msg-file "$RUNNER_TEMP/pr-title.txt"
