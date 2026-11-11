@@ -163,3 +163,36 @@ def test_hook_reads_the_temporary_index_of_the_commit(hooked: GitRepo, args: lis
     assert proc.returncode != 0
     assert "Removed public names:\n  pkg:\n    - beta" in proc.stderr
     assert index.read_bytes() == staged
+
+
+@pytest.mark.parametrize(
+    ("template", "comment_char"),
+    [
+        pytest.param("# type(scope): subject\n#\n# BREAKING CHANGE: description\n", None, id="comment"),
+        pytest.param("\n\n", None, id="blank"),
+        pytest.param("; type(scope): subject\n", ";", id="comment-char"),
+    ],
+)
+def test_hook_skips_the_comment_lines_of_a_template(hooked: GitRepo, template: str, comment_char: str | None) -> None:
+    """git gives the hook the message file before it removes the comment lines and the blank lines at the start."""
+    template_file = hooked.path.parent / "template.txt"
+    template_file.write_text(template, encoding="utf-8")
+    hooked.git("config", "commit.template", str(template_file))
+    if comment_char is not None:
+        hooked.git("config", "core.commentChar", comment_char)
+    hooked.write("README.md", "# pkg\n\nDocs.\n")
+    hooked.git("add", "--all")
+    # The editor adds the header after the template text, as a person does.
+    editor = 'sh -c \'printf "chore: x\\n" >> "$1"\' -'
+
+    proc = subprocess.run(  # nosec B603 B607
+        ["git", "commit"],
+        cwd=hooked.path,
+        env={**hooked.env, "GIT_EDITOR": editor},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    assert _head_subject(hooked) == "chore: x"

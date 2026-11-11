@@ -15,6 +15,7 @@ from sheridan.diffract._git_utils import (
     get_api_at_ref,
     get_changed_paths,
     get_changed_paths_index,
+    get_comment_prefixes,
     get_repo,
     has_python_changes,
 )
@@ -98,6 +99,27 @@ class TestGetRepo:
         mock_repo = MagicMock()
         mocker.patch("sheridan.diffract._git_utils.Repo", return_value=mock_repo)
         assert get_repo(tmp_path) is mock_repo
+
+
+class TestGetCommentPrefixes:
+    """Tests for get_comment_prefixes() in a real repository."""
+
+    def test_default_is_hash(self, git_repo: Repo) -> None:
+        assert get_comment_prefixes(git_repo) == ("#",)
+
+    @pytest.mark.parametrize(("key", "value"), [("commentChar", ";"), ("commentString", "//")])
+    def test_reads_the_value(self, git_repo: Repo, key: str, value: str) -> None:
+        git_repo.git.config(f"core.{key}", value)
+        assert get_comment_prefixes(git_repo) == (value,)
+
+    def test_last_value_has_priority(self, git_repo: Repo) -> None:
+        git_repo.git.config("core.commentChar", ";")
+        git_repo.git.config("core.commentString", "%")
+        assert get_comment_prefixes(git_repo) == ("%",)
+
+    def test_auto_gives_each_possible_character(self, git_repo: Repo) -> None:
+        git_repo.git.config("core.commentChar", "auto")
+        assert get_comment_prefixes(git_repo) == ("#", ";", "@", "!", "$", "%", "^", "&", "|", ":")
 
 
 class TestHasPythonChanges:
