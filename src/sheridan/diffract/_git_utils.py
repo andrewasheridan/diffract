@@ -16,8 +16,8 @@ from pathlib import Path, PurePosixPath
 
 from git import BadName, GitCommandError, InvalidGitRepositoryError, Repo
 
-from sheridan.diffract.differ import ApiSurface
-from sheridan.diffract.exceptions import GitError, SurfaceError
+from sheridan.diffract._differ import ApiSurface
+from sheridan.diffract._exceptions import GitError, SurfaceError
 from sheridan.iceberg import Module, Package, get_public_api
 
 

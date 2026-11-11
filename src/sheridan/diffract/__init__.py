@@ -4,7 +4,6 @@ __all__ = [
     "ApiDiff",
     "ChangeKind",
     "CommitType",
-    "DiffractConfig",
     "DiffractError",
     "DiffractResult",
     "GitError",
@@ -14,16 +13,14 @@ __all__ = [
     "__version__",
     "check",
     "check_staged",
-    "load_config",
 ]
 
 import importlib.metadata
 
-from sheridan.diffract.checker import check, check_staged
-from sheridan.diffract.config import DiffractConfig, load_config
-from sheridan.diffract.enums import ChangeKind, CommitType
-from sheridan.diffract.exceptions import DiffractError, GitError, SurfaceError
-from sheridan.diffract.models import ApiDiff, DiffractResult, NameChange, SignatureChange
+from sheridan.diffract._checker import check, check_staged
+from sheridan.diffract._enums import ChangeKind, CommitType
+from sheridan.diffract._exceptions import DiffractError, GitError, SurfaceError
+from sheridan.diffract._models import ApiDiff, DiffractResult, NameChange, SignatureChange
 
 try:
     __version__: str = importlib.metadata.version("sheridan-diffract")

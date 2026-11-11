@@ -19,9 +19,6 @@ package sheridan.diffract
 │   ├── test
 │   ├── other
 │   └── property possible_types: tuple[str, ...]
-├── class DiffractConfig
-│   ├── src: str | None
-│   └── tests: str | None
 ├── class DiffractError(Exception)
 ├── class DiffractResult
 │   ├── commit_type: CommitType
@@ -42,5 +39,4 @@ package sheridan.diffract
 │   └── is_breaking: bool
 ├── class SurfaceError(DiffractError)
 ├── def check(base_ref: str = 'HEAD~1', head_ref: str = 'HEAD', repo_path: Path | None = None, src_path: str = 'src', tests_path: str = 'tests') -> DiffractResult
-├── def check_staged(repo_path: Path | None = None, src_path: str = 'src', tests_path: str = 'tests') -> DiffractResult
-└── def load_config(repo_root: Path) -> DiffractConfig
+└── def check_staged(repo_path: Path | None = None, src_path: str = 'src', tests_path: str = 'tests') -> DiffractResult

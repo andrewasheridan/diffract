@@ -14,19 +14,19 @@ Run `task check` before you say that a change is done. It runs these gates:
 
 ## Architecture
 
-The code is in `src/sheridan/diffract/`. `checker.py` connects the steps:
+The code is in `src/sheridan/diffract/`. `_checker.py` connects the steps:
 
-1. Git: `git_utils.py` uses `git archive` to write only the source directory of a ref (or
+1. Git: `_git_utils.py` uses `git archive` to write only the source directory of a ref (or
    of the staging area) to a temporary directory. It also gives the paths of the changed
    files. `has_python_changes` finds if `.py` or `.pyi` files in a directory changed.
-2. Extract: `git_utils.py` calls `sheridan.iceberg.get_public_api` on each tree. It gives
+2. Extract: `_git_utils.py` calls `sheridan.iceberg.get_public_api` on each tree. It gives
    a dict from each dotted module name to the iceberg `Module`. The dotted name is the
    key because iceberg joins a chain of single-child packages at the top of the tree.
-3. Diff: `differ.py` compares the two APIs and makes an `ApiDiff`. It finds the added
+3. Diff: `_differ.py` compares the two APIs and makes an `ApiDiff`. It finds the added
    and removed names (also class members) and the changes to the signatures, the bases
    and the kinds of the names at the two refs (`SignatureChange`). `docs/api-changes.md`
    lists the rules.
-4. Classify: `classifier.py` gives the group of possible types (`CommitType`), in this
+4. Classify: `_classifier.py` gives the group of possible types (`CommitType`), in this
    order of priority:
    - a public name was removed, or had a breaking change: `feat!`
    - a public name was added, or had a change that adds to it: `feat`
@@ -40,11 +40,11 @@ The code is in `src/sheridan/diffract/`. `checker.py` connects the steps:
 
 Other modules:
 
-- `models.py`, `enums.py` and `exceptions.py`: the frozen dataclasses, the `StrEnum`s
+- `_models.py`, `_enums.py` and `_exceptions.py`: the frozen dataclasses, the `StrEnum`s
   and the `DiffractError` exceptions.
-- `config.py`: reads `src` and `tests` from `diffract.toml` or from `[tool.diffract]` in
+- `_config.py`: reads `src` and `tests` from `diffract.toml` or from `[tool.diffract]` in
   `pyproject.toml`. The `--src` and `--tests` flags have priority over both files.
-- `cli.py`: the `diffract` command. With `--validate-msg-file` and no refs, it compares
+- `_cli.py`: the `diffract` command. With `--validate-msg-file` and no refs, it compares
   `HEAD` with the staging area. This is the `commit-msg` hook mode. The check fails
   if the written type is not possible for the result. `feat!` needs a `!` or a
   `BREAKING CHANGE:` footer. `feat` also accepts a breaking message. `code` accepts

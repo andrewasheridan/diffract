@@ -32,31 +32,31 @@ def _clone(tmp_path: Path) -> GitRepo:
 
 @pytest.mark.skipif(not (ROOT / ".git").exists(), reason="needs the diffract git repository, not an sdist")
 def test_diffract_on_itself(tmp_path: Path) -> None:
-    """To remove ``load_config`` from ``__all__`` is a breaking change. To add it again is a feature."""
+    """To remove ``check_staged`` from ``__all__`` is a breaking change. To add it again is a feature."""
     clone = _clone(tmp_path)
     init = clone.path / INIT
     original = init.read_text(encoding="utf-8")
-    assert '    "load_config",\n' in original
+    assert '    "check_staged",\n' in original
 
     proc = clone.diffract("HEAD", "HEAD", "--json")
     assert proc.returncode == 0, proc.stderr
     assert json.loads(proc.stdout)["group"] == "other"
 
-    clone.write(INIT, original.replace('    "load_config",\n', ""))
-    clone.commit("feat!: remove load_config")
+    clone.write(INIT, original.replace('    "check_staged",\n', ""))
+    clone.commit("feat!: remove check_staged")
     proc = clone.diffract("--json", "--exit-code")
     assert proc.returncode == 1, proc.stderr
     data = json.loads(proc.stdout)
     assert data["group"] == "feat!"
     assert data["diff"] == {
         "added": [],
-        "removed": [{"module": "sheridan.diffract", "name": "load_config"}],
+        "removed": [{"module": "sheridan.diffract", "name": "check_staged"}],
         "changed": [],
     }
 
     clone.write(INIT, original)
-    clone.commit("feat: restore load_config")
+    clone.commit("feat: restore check_staged")
     proc = clone.diffract("--exit-code")
     assert proc.returncode == 2, proc.stderr
-    assert "Added public names:\n  sheridan.diffract:\n    + load_config" in proc.stdout
+    assert "Added public names:\n  sheridan.diffract:\n    + check_staged" in proc.stdout
     assert clone.diffract("HEAD~2", "HEAD", "--exit-code").returncode == 0

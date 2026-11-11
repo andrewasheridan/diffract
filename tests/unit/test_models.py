@@ -1,11 +1,11 @@
-"""Tests for sheridan.diffract.models."""
+"""Tests for sheridan.diffract._models."""
 
 import json
 
 import pytest
 
-from sheridan.diffract.enums import ChangeKind, CommitType
-from sheridan.diffract.models import ApiDiff, DiffractResult, NameChange, SignatureChange
+from sheridan.diffract._enums import ChangeKind, CommitType
+from sheridan.diffract._models import ApiDiff, DiffractResult, NameChange, SignatureChange
 
 
 class TestNameChange:

@@ -2,9 +2,9 @@
 
 import pytest
 
-from sheridan.diffract.differ import ApiSurface
-from sheridan.diffract.enums import ChangeKind
-from sheridan.diffract.models import ApiDiff, NameChange
+from sheridan.diffract._differ import ApiSurface
+from sheridan.diffract._enums import ChangeKind
+from sheridan.diffract._models import ApiDiff, NameChange
 from sheridan.iceberg import Assignment, Module
 
 

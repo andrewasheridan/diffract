@@ -50,7 +50,7 @@ dev = [
 ]
 
 [project.scripts]
-diffract = "sheridan.diffract.cli:main"
+diffract = "sheridan.diffract._cli:main"
 
 [tool.hatch.build.targets.sdist]
 include = [

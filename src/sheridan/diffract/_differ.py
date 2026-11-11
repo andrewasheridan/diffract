@@ -4,8 +4,8 @@ __all__ = ["ApiSurface", "diff_surfaces", "public_names"]
 
 from collections.abc import Iterable
 
-from sheridan.diffract.enums import ChangeKind
-from sheridan.diffract.models import ApiDiff, NameChange, SignatureChange
+from sheridan.diffract._enums import ChangeKind
+from sheridan.diffract._models import ApiDiff, NameChange, SignatureChange
 from sheridan.iceberg import Assignment, Class, Function, Module, Parameter, Reference
 
 type ApiSurface = dict[str, Module]

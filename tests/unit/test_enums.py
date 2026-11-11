@@ -1,6 +1,6 @@
-"""Tests for sheridan.diffract.enums."""
+"""Tests for sheridan.diffract._enums."""
 
-from sheridan.diffract.enums import ChangeKind, CommitType
+from sheridan.diffract._enums import ChangeKind, CommitType
 
 
 class TestCommitType:

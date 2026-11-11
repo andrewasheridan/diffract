@@ -11,13 +11,13 @@ from pathlib import Path
 from typing import NoReturn, override
 
 from sheridan.diffract import __version__
-from sheridan.diffract.checker import check, check_staged
-from sheridan.diffract.classifier import group_by_module, group_changes_by_module
-from sheridan.diffract.config import load_config
-from sheridan.diffract.enums import CommitType
-from sheridan.diffract.exceptions import DiffractError
-from sheridan.diffract.git_utils import get_repo
-from sheridan.diffract.models import DiffractResult
+from sheridan.diffract._checker import check, check_staged
+from sheridan.diffract._classifier import group_by_module, group_changes_by_module
+from sheridan.diffract._config import load_config
+from sheridan.diffract._enums import CommitType
+from sheridan.diffract._exceptions import DiffractError
+from sheridan.diffract._git_utils import get_repo
+from sheridan.diffract._models import DiffractResult
 
 _COMMIT_TYPE_RE: re.Pattern[str] = re.compile(r"^([a-z]+)(\(([^)]*)\))?(!)?:")
 _BREAKING_FOOTER_RE: re.Pattern[str] = re.compile(r"^BREAKING[ -]CHANGE: ", re.MULTILINE)
@@ -368,7 +368,7 @@ def main() -> None:
 
     If you use ``--validate-msg-file`` and give no BASE_REF or HEAD_REF, the command
     compares ``HEAD`` with the staging area. It uses
-    :func:`~sheridan.diffract.checker.check_staged` for this.
+    :func:`~sheridan.diffract._checker.check_staged` for this.
 
     An unexpected exception does not show a traceback. diffract writes a short message
     with a link to the issue tracker to stderr.

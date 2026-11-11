@@ -1,8 +1,8 @@
-"""Tests for sheridan.diffract.classifier."""
+"""Tests for sheridan.diffract._classifier."""
 
-from sheridan.diffract.classifier import classify
-from sheridan.diffract.enums import CommitType
-from sheridan.diffract.models import ApiDiff, SignatureChange
+from sheridan.diffract._classifier import classify
+from sheridan.diffract._enums import CommitType
+from sheridan.diffract._models import ApiDiff, SignatureChange
 
 
 class TestClassify:
