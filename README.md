@@ -21,7 +21,7 @@ diffract supports only Python 3.14 and later.
 |---|---|---|
 | A public name was removed, or had a breaking change (for example, a parameter was removed) | `feat!` | `feat!` (breaking) |
 | A public name was added, or had a change that adds to it (for example, a new optional parameter) | `feat` | `feat` |
-| A `.py` or `.pyi` file in the source directory changed, and no public name changed | `code` | `fix`, `refactor`, `perf`, `style` |
+| A `.py` or `.pyi` file in the source directory changed, and no public name changed | `code` | `fix`, `refactor`, `perf`, `style`, `docs` |
 | A `.py` or `.pyi` file in the test directory changed | `test` | `test` |
 | All other changes | `other` | `docs`, `ci`, `chore`, `build` |
 
@@ -69,7 +69,7 @@ You can also run diffract as a module: `python -m sheridan.diffract`. The module
 **Exit codes:**
 
 - `0`: no change to the public API, or `--exit-code` is not set.
-- `1`: with `--exit-code`, a breaking change (a public name was removed, or had a breaking change). With `--validate-msg-file`, a commit message with a type that is not possible for the change.
+- `1`: with `--exit-code`, a breaking change (a public name was removed, or had a breaking change). With `--validate-msg-file`, a commit message with a type that tells less than the API change.
 - `2`: with `--exit-code`, a change that is not breaking (a public name was added, or had a change that adds to it).
 - `3`: an error. This can be a usage error, a git, file or configuration error, or an unexpected error. For an unexpected error, diffract writes a short message with a link to the issue tracker.
 
@@ -103,7 +103,7 @@ from sheridan.diffract import check
 
 result = check(base_ref="v1.2.0", head_ref="HEAD")
 print(result.commit_type)   # the group, for example "feat!" or "code"
-print(result.commit_type.possible_types)  # for example ("fix", "refactor", "perf", "style")
+print(result.commit_type.possible_types)  # for example ("fix", "refactor", "perf", "style", "docs")
 print(result.summary)       # a description for people
 print(result.diff.removed)  # a tuple of NameChange objects
 print(result.diff.added)
@@ -124,15 +124,13 @@ print(result.commit_type)  # the group of the staged change, not of the last com
 
 ### Validate commit messages with pre-commit or prek
 
-`diffract` has a `commit-msg` hook. The hook rejects a commit message if the commit type is not possible for the change:
+`diffract` has a `commit-msg` hook. The hook rejects a commit message if the commit type tells less than the change to the public API:
 
 | Change that diffract finds | Types that pass |
 |---|---|
 | A public name was removed or had a breaking change (`feat!`) | Any type with a `!` or a `BREAKING CHANGE:` footer |
 | A public name was added or had a change that adds to it (`feat`) | `feat`, or any type with a `!` or a `BREAKING CHANGE:` footer |
-| Python files in the source directory changed (`code`) | `fix`, `refactor`, `perf`, `style` or `feat`, or any type with a `!` or a `BREAKING CHANGE:` footer |
-| Only Python files in the test directory changed (`test`) | `test` |
-| All other changes (`other`) | `docs`, `ci`, `chore` or `build` |
+| No public name changed (`code`, `test` or `other`) | Any Conventional Commit type |
 
 The hook also obeys these rules:
 
@@ -141,7 +139,9 @@ The hook also obeys these rules:
 - The hook does not check the messages that git writes: `Merge …`, `Revert "…"`, `fixup! …`, `amend! …` and `squash! …`.
 - The hook ignores comment lines and the blank lines at the start of the message, as git does. A comment line starts with `#`, or with the value of `core.commentChar`.
 
-A change in behavior does not always change a public name. Thus the hook accepts `feat` and a breaking message for a `code` change.
+diffract compares only the public API. If no public name changed, diffract cannot tell a fix from a docs change. Thus the hook accepts each type.
+
+If the type is `feat` and no public name changed, the hook writes a warning to stderr. The commit continues, because a change in behavior can be a feature also when no public name changes.
 
 ```yaml
 # .pre-commit-config.yaml

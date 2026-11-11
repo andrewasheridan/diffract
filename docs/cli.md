@@ -95,7 +95,7 @@ This can be a docs, ci, chore or build commit.
 | Code | Meaning |
 |---|---|
 | `0` | No public name changed, or the command has no `--exit-code` flag. |
-| `1` | With `--exit-code`, a public name was removed or had a breaking change. With `--validate-msg-file`, the commit type in the message is not possible for the change. |
+| `1` | With `--exit-code`, a public name was removed or had a breaking change. With `--validate-msg-file`, the commit type in the message tells less than the API change. |
 | `2` | With `--exit-code`, a public name was added or had a change that adds to it, and no breaking change occurred. |
 | `3` | An error. This can be a usage error, a git, file or configuration error, or an unexpected error. |
 

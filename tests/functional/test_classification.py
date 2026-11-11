@@ -132,9 +132,9 @@ def test_human_output_gives_the_possible_types(repo: GitRepo) -> None:
     proc = repo.diffract()
 
     assert proc.returncode == 0, proc.stderr
-    assert "This can be a fix, refactor, perf or style commit." in proc.stdout
+    assert "This can be a fix, refactor, perf, style or docs commit." in proc.stdout
     assert "Suggested commit prefix" not in proc.stdout
-    assert _json(repo)["possible_types"] == ["fix", "refactor", "perf", "style"]
+    assert _json(repo)["possible_types"] == ["fix", "refactor", "perf", "style", "docs"]
 
 
 def test_tests_flag_and_config_files(repo: GitRepo) -> None:

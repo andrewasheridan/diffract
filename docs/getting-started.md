@@ -53,7 +53,7 @@ of possible types. The first rule that applies gives the result:
 |---|---|---|
 | A public name was removed, or had a breaking change (for example, a parameter was removed) | `feat!` | `feat!` (breaking) |
 | A public name was added, or had a change that adds to it (for example, a new optional parameter) | `feat` | `feat` |
-| A `.py` or `.pyi` file in the source directory changed, and no public name changed | `code` | `fix`, `refactor`, `perf`, `style` |
+| A `.py` or `.pyi` file in the source directory changed, and no public name changed | `code` | `fix`, `refactor`, `perf`, `style`, `docs` |
 | A `.py` or `.pyi` file in the test directory changed | `test` | `test` |
 | All other changes | `other` | `docs`, `ci`, `chore`, `build` |
 
