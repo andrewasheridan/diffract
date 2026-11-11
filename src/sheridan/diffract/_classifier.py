@@ -4,8 +4,8 @@ __all__ = ["classify"]
 
 from collections import defaultdict
 
-from sheridan.diffract.enums import CommitType
-from sheridan.diffract.models import ApiDiff, NameChange, SignatureChange
+from sheridan.diffract._enums import CommitType
+from sheridan.diffract._models import ApiDiff, NameChange, SignatureChange
 
 
 def group_by_module(changes: tuple[NameChange, ...]) -> dict[str, list[str]]:
@@ -92,7 +92,7 @@ def classify(diff: ApiDiff, *, code_changed: bool, tests_changed: bool) -> tuple
     5. All other changes: ``other``.
 
     Args:
-        diff: The API diff from :func:`sheridan.diffract.differ.diff_surfaces`.
+        diff: The API diff from :func:`sheridan.diffract._differ.diff_surfaces`.
         code_changed: True if ``.py`` or ``.pyi`` files in the source directory, and
             not in the test directory, changed between the two refs.
         tests_changed: True if ``.py`` or ``.pyi`` files in the test directory changed

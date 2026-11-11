@@ -1,6 +1,6 @@
 """Run the ``diffract`` command for ``python -m sheridan.diffract``."""
 
-from sheridan.diffract.cli import main
+from sheridan.diffract._cli import main
 
 __all__: list[str] = []
 

@@ -4,11 +4,11 @@ __all__ = ["check", "check_staged"]
 
 from pathlib import Path
 
-from sheridan.diffract.classifier import classify
-from sheridan.diffract.differ import ApiSurface, diff_surfaces
-from sheridan.diffract.enums import CommitType
-from sheridan.diffract.exceptions import SurfaceError
-from sheridan.diffract.git_utils import (
+from sheridan.diffract._classifier import classify
+from sheridan.diffract._differ import ApiSurface, diff_surfaces
+from sheridan.diffract._enums import CommitType
+from sheridan.diffract._exceptions import SurfaceError
+from sheridan.diffract._git_utils import (
     get_api_at_index,
     get_api_at_ref,
     get_changed_paths,
@@ -16,7 +16,7 @@ from sheridan.diffract.git_utils import (
     get_repo,
     has_python_changes,
 )
-from sheridan.diffract.models import ApiDiff, DiffractResult
+from sheridan.diffract._models import ApiDiff, DiffractResult
 
 
 def _resolve_surfaces(
@@ -99,7 +99,7 @@ def check(
         tests_path: The directory in the repository that contains the tests.
 
     Returns:
-        A :class:`~sheridan.diffract.models.DiffractResult` with the group of possible
+        A :class:`~sheridan.diffract._models.DiffractResult` with the group of possible
         commit types, a summary and the full API diff.
 
     Raises:
@@ -149,7 +149,7 @@ def check_staged(
         tests_path: The directory in the repository that contains the tests.
 
     Returns:
-        A :class:`~sheridan.diffract.models.DiffractResult` with the group of possible
+        A :class:`~sheridan.diffract._models.DiffractResult` with the group of possible
         commit types, a summary and the full API diff. ``base_ref`` is ``"HEAD"`` and ``head_ref``
         is ``":staged"``.
 

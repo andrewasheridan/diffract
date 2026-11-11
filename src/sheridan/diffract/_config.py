@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from sheridan.diffract.exceptions import DiffractError
+from sheridan.diffract._exceptions import DiffractError
 
 
 @dataclass(frozen=True)

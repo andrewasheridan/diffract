@@ -2,10 +2,10 @@
 
 from git import Repo
 
-from sheridan.diffract.differ import diff_surfaces
-from sheridan.diffract.enums import ChangeKind
-from sheridan.diffract.git_utils import get_api_at_ref
-from sheridan.diffract.models import ApiDiff, NameChange
+from sheridan.diffract._differ import diff_surfaces
+from sheridan.diffract._enums import ChangeKind
+from sheridan.diffract._git_utils import get_api_at_ref
+from sheridan.diffract._models import ApiDiff, NameChange
 from tests.functional.conftest import GitRepo
 
 

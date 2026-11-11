@@ -1,4 +1,4 @@
-"""Tests for sheridan.diffract.config."""
+"""Tests for sheridan.diffract._config."""
 
 import dataclasses
 import re
@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from sheridan.diffract.config import DiffractConfig, load_config
-from sheridan.diffract.exceptions import DiffractError
+from sheridan.diffract._config import DiffractConfig, load_config
+from sheridan.diffract._exceptions import DiffractError
 
 
 class TestDiffractConfig:

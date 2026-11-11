@@ -1,13 +1,13 @@
-"""Tests for sheridan.diffract.checker."""
+"""Tests for sheridan.diffract._checker."""
 
 from pathlib import Path
 
 import pytest
 
-from sheridan.diffract.checker import check, check_staged
-from sheridan.diffract.enums import CommitType
-from sheridan.diffract.exceptions import GitError, SurfaceError
-from sheridan.diffract.models import ApiDiff, DiffractResult
+from sheridan.diffract._checker import check, check_staged
+from sheridan.diffract._enums import CommitType
+from sheridan.diffract._exceptions import GitError, SurfaceError
+from sheridan.diffract._models import ApiDiff, DiffractResult
 from tests.unit.conftest import surface
 
 
@@ -16,11 +16,11 @@ class TestCheck:
 
     def test_returns_diffract_result(self, empty_diff: ApiDiff, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
         """check() must give a DiffractResult if all the calls are successful."""
-        mocker.patch("sheridan.diffract.checker.get_repo")
-        mocker.patch("sheridan.diffract.checker.get_api_at_ref", return_value={})
-        mocker.patch("sheridan.diffract.checker.get_changed_paths", return_value=[])
-        mocker.patch("sheridan.diffract.checker.diff_surfaces", return_value=empty_diff)
-        mocker.patch("sheridan.diffract.checker.classify", return_value=(CommitType.other, "No changes."))
+        mocker.patch("sheridan.diffract._checker.get_repo")
+        mocker.patch("sheridan.diffract._checker.get_api_at_ref", return_value={})
+        mocker.patch("sheridan.diffract._checker.get_changed_paths", return_value=[])
+        mocker.patch("sheridan.diffract._checker.diff_surfaces", return_value=empty_diff)
+        mocker.patch("sheridan.diffract._checker.classify", return_value=(CommitType.other, "No changes."))
 
         result = check(repo_path=Path("/tmp"))
 
@@ -30,11 +30,11 @@ class TestCheck:
 
     def test_passes_refs_and_src_path_through(self, empty_diff: ApiDiff, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
         """check() must give base_ref, head_ref and src_path to get_api_at_ref."""
-        mocker.patch("sheridan.diffract.checker.get_repo")
-        mock_get_api = mocker.patch("sheridan.diffract.checker.get_api_at_ref", return_value={})
-        mocker.patch("sheridan.diffract.checker.get_changed_paths", return_value=[])
-        mocker.patch("sheridan.diffract.checker.diff_surfaces", return_value=empty_diff)
-        mocker.patch("sheridan.diffract.checker.classify", return_value=(CommitType.other, "ok"))
+        mocker.patch("sheridan.diffract._checker.get_repo")
+        mock_get_api = mocker.patch("sheridan.diffract._checker.get_api_at_ref", return_value={})
+        mocker.patch("sheridan.diffract._checker.get_changed_paths", return_value=[])
+        mocker.patch("sheridan.diffract._checker.diff_surfaces", return_value=empty_diff)
+        mocker.patch("sheridan.diffract._checker.classify", return_value=(CommitType.other, "ok"))
 
         check(base_ref="v1.0", head_ref="v2.0", src_path="lib", repo_path=Path("/tmp"))
 
@@ -47,11 +47,11 @@ class TestCheck:
 
     def test_defaults_repo_path_to_cwd(self, empty_diff: ApiDiff, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
         """check() must use Path.cwd() if there is no repo_path."""
-        mock_get_repo = mocker.patch("sheridan.diffract.checker.get_repo")
-        mocker.patch("sheridan.diffract.checker.get_api_at_ref", return_value={})
-        mocker.patch("sheridan.diffract.checker.get_changed_paths", return_value=[])
-        mocker.patch("sheridan.diffract.checker.diff_surfaces", return_value=empty_diff)
-        mocker.patch("sheridan.diffract.checker.classify", return_value=(CommitType.other, "ok"))
+        mock_get_repo = mocker.patch("sheridan.diffract._checker.get_repo")
+        mocker.patch("sheridan.diffract._checker.get_api_at_ref", return_value={})
+        mocker.patch("sheridan.diffract._checker.get_changed_paths", return_value=[])
+        mocker.patch("sheridan.diffract._checker.diff_surfaces", return_value=empty_diff)
+        mocker.patch("sheridan.diffract._checker.classify", return_value=(CommitType.other, "ok"))
 
         check()
 
@@ -59,21 +59,21 @@ class TestCheck:
 
     def test_propagates_git_error_from_get_repo(self, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
         """check() must not stop a GitError from get_repo."""
-        mocker.patch("sheridan.diffract.checker.get_repo", side_effect=GitError("no repo"))
+        mocker.patch("sheridan.diffract._checker.get_repo", side_effect=GitError("no repo"))
         with pytest.raises(GitError, match="no repo"):
             check(repo_path=Path("/tmp"))
 
     def test_propagates_git_error_from_get_api_at_ref(self, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
         """check() must not stop a GitError from get_api_at_ref."""
-        mocker.patch("sheridan.diffract.checker.get_repo")
-        mocker.patch("sheridan.diffract.checker.get_api_at_ref", side_effect=GitError("bad ref"))
+        mocker.patch("sheridan.diffract._checker.get_repo")
+        mocker.patch("sheridan.diffract._checker.get_api_at_ref", side_effect=GitError("bad ref"))
         with pytest.raises(GitError, match="bad ref"):
             check(repo_path=Path("/tmp"))
 
     def test_propagates_surface_error(self, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
         """check() must not stop a SurfaceError from get_api_at_ref."""
-        mocker.patch("sheridan.diffract.checker.get_repo")
-        mocker.patch("sheridan.diffract.checker.get_api_at_ref", side_effect=SurfaceError("boom"))
+        mocker.patch("sheridan.diffract._checker.get_repo")
+        mocker.patch("sheridan.diffract._checker.get_api_at_ref", side_effect=SurfaceError("boom"))
         with pytest.raises(SurfaceError, match="boom"):
             check(repo_path=Path("/tmp"))
 
@@ -86,18 +86,18 @@ class TestCheckStaged:
         empty_diff: ApiDiff,
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        mocker.patch("sheridan.diffract.checker.get_repo")
+        mocker.patch("sheridan.diffract._checker.get_repo")
         mocker.patch(
-            "sheridan.diffract.checker.get_api_at_ref",
+            "sheridan.diffract._checker.get_api_at_ref",
             return_value={"mod": ["Foo"]},
         )
         mocker.patch(
-            "sheridan.diffract.checker.get_api_at_index",
+            "sheridan.diffract._checker.get_api_at_index",
             return_value={"mod": ["Foo", "Bar"]},
         )
-        mocker.patch("sheridan.diffract.checker.get_changed_paths_index", return_value=["src/pkg/mod.py"])
-        mocker.patch("sheridan.diffract.checker.diff_surfaces")
-        mocker.patch("sheridan.diffract.checker.classify", return_value=(CommitType.feat, "Added Bar."))
+        mocker.patch("sheridan.diffract._checker.get_changed_paths_index", return_value=["src/pkg/mod.py"])
+        mocker.patch("sheridan.diffract._checker.diff_surfaces")
+        mocker.patch("sheridan.diffract._checker.classify", return_value=(CommitType.feat, "Added Bar."))
 
         result = check_staged(repo_path=Path("/tmp"))
 
@@ -111,15 +111,15 @@ class TestCheckStaged:
         empty_diff: ApiDiff,
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        mocker.patch("sheridan.diffract.checker.get_repo")
+        mocker.patch("sheridan.diffract._checker.get_repo")
         mock_get_api_at_ref = mocker.patch(
-            "sheridan.diffract.checker.get_api_at_ref",
+            "sheridan.diffract._checker.get_api_at_ref",
             return_value={},
         )
-        mocker.patch("sheridan.diffract.checker.get_api_at_index", return_value={})
-        mocker.patch("sheridan.diffract.checker.get_changed_paths_index", return_value=[])
-        mocker.patch("sheridan.diffract.checker.diff_surfaces", return_value=empty_diff)
-        mocker.patch("sheridan.diffract.checker.classify", return_value=(CommitType.other, "ok"))
+        mocker.patch("sheridan.diffract._checker.get_api_at_index", return_value={})
+        mocker.patch("sheridan.diffract._checker.get_changed_paths_index", return_value=[])
+        mocker.patch("sheridan.diffract._checker.diff_surfaces", return_value=empty_diff)
+        mocker.patch("sheridan.diffract._checker.classify", return_value=(CommitType.other, "ok"))
 
         check_staged(repo_path=Path("/tmp"))
 
@@ -135,15 +135,15 @@ class TestCheckStaged:
     ) -> None:
         mock_repo = mocker.MagicMock()
         mock_repo.head.is_valid.return_value = False
-        mocker.patch("sheridan.diffract.checker.get_repo", return_value=mock_repo)
-        mock_get_api_at_ref = mocker.patch("sheridan.diffract.checker.get_api_at_ref")
+        mocker.patch("sheridan.diffract._checker.get_repo", return_value=mock_repo)
+        mock_get_api_at_ref = mocker.patch("sheridan.diffract._checker.get_api_at_ref")
         mocker.patch(
-            "sheridan.diffract.checker.get_api_at_index",
+            "sheridan.diffract._checker.get_api_at_index",
             return_value={"mod": ["NewClass"]},
         )
-        mocker.patch("sheridan.diffract.checker.get_changed_paths_index", return_value=["src/pkg/mod.py"])
-        mock_diff = mocker.patch("sheridan.diffract.checker.diff_surfaces")
-        mocker.patch("sheridan.diffract.checker.classify", return_value=(CommitType.feat, "Added."))
+        mocker.patch("sheridan.diffract._checker.get_changed_paths_index", return_value=["src/pkg/mod.py"])
+        mock_diff = mocker.patch("sheridan.diffract._checker.diff_surfaces")
+        mocker.patch("sheridan.diffract._checker.classify", return_value=(CommitType.feat, "Added."))
 
         result = check_staged(repo_path=Path("/tmp"))
 
@@ -159,10 +159,10 @@ class TestCheckStaged:
         self,
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        mocker.patch("sheridan.diffract.checker.get_repo")
-        mocker.patch("sheridan.diffract.checker.get_api_at_ref", return_value={})
+        mocker.patch("sheridan.diffract._checker.get_repo")
+        mocker.patch("sheridan.diffract._checker.get_api_at_ref", return_value={})
         mocker.patch(
-            "sheridan.diffract.checker.get_api_at_index",
+            "sheridan.diffract._checker.get_api_at_index",
             side_effect=SurfaceError("index boom"),
         )
 
@@ -174,12 +174,12 @@ class TestCheckStaged:
         empty_diff: ApiDiff,
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        mock_get_repo = mocker.patch("sheridan.diffract.checker.get_repo")
-        mocker.patch("sheridan.diffract.checker.get_api_at_ref", return_value={})
-        mocker.patch("sheridan.diffract.checker.get_api_at_index", return_value={})
-        mocker.patch("sheridan.diffract.checker.get_changed_paths_index", return_value=[])
-        mocker.patch("sheridan.diffract.checker.diff_surfaces", return_value=empty_diff)
-        mocker.patch("sheridan.diffract.checker.classify", return_value=(CommitType.other, "ok"))
+        mock_get_repo = mocker.patch("sheridan.diffract._checker.get_repo")
+        mocker.patch("sheridan.diffract._checker.get_api_at_ref", return_value={})
+        mocker.patch("sheridan.diffract._checker.get_api_at_index", return_value={})
+        mocker.patch("sheridan.diffract._checker.get_changed_paths_index", return_value=[])
+        mocker.patch("sheridan.diffract._checker.diff_surfaces", return_value=empty_diff)
+        mocker.patch("sheridan.diffract._checker.classify", return_value=(CommitType.other, "ok"))
 
         check_staged()
 
@@ -189,7 +189,7 @@ class TestCheckStaged:
         self,
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        mocker.patch("sheridan.diffract.checker.get_repo", side_effect=GitError("no repo"))
+        mocker.patch("sheridan.diffract._checker.get_repo", side_effect=GitError("no repo"))
 
         with pytest.raises(GitError, match="no repo"):
             check_staged(repo_path=Path("/tmp"))
@@ -199,12 +199,12 @@ class TestCheckStaged:
         empty_diff: ApiDiff,
         mocker: pytest.fixture,  # type: ignore[type-arg]
     ) -> None:
-        mocker.patch("sheridan.diffract.checker.get_repo")
-        mocker.patch("sheridan.diffract.checker.get_api_at_ref", return_value={})
-        mock_index = mocker.patch("sheridan.diffract.checker.get_api_at_index", return_value={})
-        mocker.patch("sheridan.diffract.checker.get_changed_paths_index", return_value=[])
-        mocker.patch("sheridan.diffract.checker.diff_surfaces", return_value=empty_diff)
-        mocker.patch("sheridan.diffract.checker.classify", return_value=(CommitType.other, "ok"))
+        mocker.patch("sheridan.diffract._checker.get_repo")
+        mocker.patch("sheridan.diffract._checker.get_api_at_ref", return_value={})
+        mock_index = mocker.patch("sheridan.diffract._checker.get_api_at_index", return_value={})
+        mocker.patch("sheridan.diffract._checker.get_changed_paths_index", return_value=[])
+        mocker.patch("sheridan.diffract._checker.diff_surfaces", return_value=empty_diff)
+        mocker.patch("sheridan.diffract._checker.classify", return_value=(CommitType.other, "ok"))
 
         check_staged(repo_path=Path("/tmp"), src_path="lib")
 
@@ -216,11 +216,11 @@ class TestChangedFiles:
     """Tests for the groups that check() and check_staged() give from the changed files."""
 
     def _patch(self, mocker: pytest.fixture, changed_paths: list[str]) -> None:  # type: ignore[type-arg]
-        mocker.patch("sheridan.diffract.checker.get_repo")
-        mocker.patch("sheridan.diffract.checker.get_api_at_ref", return_value={})
-        mocker.patch("sheridan.diffract.checker.get_api_at_index", return_value={})
-        mocker.patch("sheridan.diffract.checker.get_changed_paths", return_value=changed_paths)
-        mocker.patch("sheridan.diffract.checker.get_changed_paths_index", return_value=changed_paths)
+        mocker.patch("sheridan.diffract._checker.get_repo")
+        mocker.patch("sheridan.diffract._checker.get_api_at_ref", return_value={})
+        mocker.patch("sheridan.diffract._checker.get_api_at_index", return_value={})
+        mocker.patch("sheridan.diffract._checker.get_changed_paths", return_value=changed_paths)
+        mocker.patch("sheridan.diffract._checker.get_changed_paths_index", return_value=changed_paths)
 
     @pytest.mark.parametrize("staged", [False, True], ids=["refs", "staged"])
     @pytest.mark.parametrize(
@@ -283,14 +283,14 @@ class TestMissingSourceDirectory:
     """Tests for a ``src_path`` that does not exist at one ref or at the two refs."""
 
     def _patch(self, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
-        mocker.patch("sheridan.diffract.checker.get_repo")
-        mocker.patch("sheridan.diffract.checker.get_changed_paths", return_value=["src/pkg/mod.py"])
-        mocker.patch("sheridan.diffract.checker.get_changed_paths_index", return_value=["src/pkg/mod.py"])
+        mocker.patch("sheridan.diffract._checker.get_repo")
+        mocker.patch("sheridan.diffract._checker.get_changed_paths", return_value=["src/pkg/mod.py"])
+        mocker.patch("sheridan.diffract._checker.get_changed_paths_index", return_value=["src/pkg/mod.py"])
 
     def test_missing_at_base_gives_an_empty_base(self, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
         """The names at the head are added, because the base API is empty."""
         self._patch(mocker)
-        mocker.patch("sheridan.diffract.checker.get_api_at_ref", side_effect=[None, surface({"pkg": ["a"]})])
+        mocker.patch("sheridan.diffract._checker.get_api_at_ref", side_effect=[None, surface({"pkg": ["a"]})])
 
         result = check(repo_path=Path("/tmp"))
 
@@ -301,7 +301,7 @@ class TestMissingSourceDirectory:
     def test_missing_at_head_gives_an_empty_head(self, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
         """The names at the base are removed, because the head API is empty."""
         self._patch(mocker)
-        mocker.patch("sheridan.diffract.checker.get_api_at_ref", side_effect=[surface({"pkg": ["a"]}), None])
+        mocker.patch("sheridan.diffract._checker.get_api_at_ref", side_effect=[surface({"pkg": ["a"]}), None])
 
         result = check(repo_path=Path("/tmp"))
 
@@ -311,7 +311,7 @@ class TestMissingSourceDirectory:
     def test_missing_at_both_refs_raises(self, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
         """A missing source directory at the two refs is an error, not an empty diff."""
         self._patch(mocker)
-        mocker.patch("sheridan.diffract.checker.get_api_at_ref", return_value=None)
+        mocker.patch("sheridan.diffract._checker.get_api_at_ref", return_value=None)
 
         with pytest.raises(SurfaceError, match="'lib' does not exist at v1 or at v2"):
             check(base_ref="v1", head_ref="v2", repo_path=Path("/tmp"), src_path="lib")
@@ -319,8 +319,8 @@ class TestMissingSourceDirectory:
     def test_staged_missing_at_head_and_index_raises(self, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
         """The commit-msg hook mode also fails if the directory is missing at HEAD and in the index."""
         self._patch(mocker)
-        mocker.patch("sheridan.diffract.checker.get_api_at_ref", return_value=None)
-        mocker.patch("sheridan.diffract.checker.get_api_at_index", return_value=None)
+        mocker.patch("sheridan.diffract._checker.get_api_at_ref", return_value=None)
+        mocker.patch("sheridan.diffract._checker.get_api_at_index", return_value=None)
 
         with pytest.raises(SurfaceError, match="does not exist at HEAD or at the staging area"):
             check_staged(repo_path=Path("/tmp"))
@@ -328,8 +328,8 @@ class TestMissingSourceDirectory:
     def test_staged_missing_at_head_gives_an_empty_base(self, mocker: pytest.fixture) -> None:  # type: ignore[type-arg]
         """The staged names are added names if the directory is missing at HEAD."""
         self._patch(mocker)
-        mocker.patch("sheridan.diffract.checker.get_api_at_ref", return_value=None)
-        mocker.patch("sheridan.diffract.checker.get_api_at_index", return_value=surface({"pkg": ["a"]}))
+        mocker.patch("sheridan.diffract._checker.get_api_at_ref", return_value=None)
+        mocker.patch("sheridan.diffract._checker.get_api_at_index", return_value=surface({"pkg": ["a"]}))
 
         result = check_staged(repo_path=Path("/tmp"))
 

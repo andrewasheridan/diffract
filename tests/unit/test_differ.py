@@ -1,10 +1,10 @@
-"""Tests for sheridan.diffract.differ."""
+"""Tests for sheridan.diffract._differ."""
 
 from typing import Literal
 
-from sheridan.diffract.differ import diff_surfaces, public_names
-from sheridan.diffract.enums import ChangeKind
-from sheridan.diffract.models import ApiDiff
+from sheridan.diffract._differ import diff_surfaces, public_names
+from sheridan.diffract._enums import ChangeKind
+from sheridan.diffract._models import ApiDiff
 from sheridan.iceberg import Assignment, Class, Function, Module, Parameter, Reference
 from tests.unit.conftest import surface
 

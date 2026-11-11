@@ -4,7 +4,7 @@ __all__ = ["ApiDiff", "DiffractResult", "NameChange", "SignatureChange"]
 
 from dataclasses import dataclass
 
-from sheridan.diffract.enums import ChangeKind, CommitType
+from sheridan.diffract._enums import ChangeKind, CommitType
 
 
 @dataclass(frozen=True)
@@ -12,7 +12,7 @@ class NameChange:
     """One public name that was added to a module or removed from a module.
 
     Attributes:
-        module: The full module name, for example ``"sheridan.diffract.enums"``.
+        module: The full module name, for example ``"sheridan.diffract._enums"``.
         name: The public name, for example ``"CommitType"``.
         kind: Tells if the name was added or removed.
     """
@@ -27,7 +27,7 @@ class SignatureChange:
     """One change to a public name that is in base and in head.
 
     Attributes:
-        module: The full module name, for example ``"sheridan.diffract.enums"``.
+        module: The full module name, for example ``"sheridan.diffract._enums"``.
         name: The public name, for example ``"check"`` or ``"ApiDiff.is_empty"``.
         detail: What changed, for example ``"parameter 'ref' was removed"``.
         is_breaking: True if the change can stop code that uses the name. False if

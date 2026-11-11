@@ -1,8 +1,8 @@
-"""Tests for sheridan.diffract.exceptions."""
+"""Tests for sheridan.diffract._exceptions."""
 
 import pytest
 
-from sheridan.diffract.exceptions import DiffractError, GitError, SurfaceError
+from sheridan.diffract._exceptions import DiffractError, GitError, SurfaceError
 
 
 class TestExceptionHierarchy:
