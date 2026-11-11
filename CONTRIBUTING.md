@@ -40,6 +40,80 @@ intentionally, do these steps:
 1. Run `task api:update`.
 2. Commit `api.txt` together with your change.
 
+## Mutation testing
+
+Line coverage shows which lines the tests run. It does not show if the tests check the
+result of those lines. [mutmut](https://github.com/boxed/mutmut) finds this gap. It
+changes the code in small ways, and each change is a "mutant". Then it runs the tests
+that call the changed function. If all of these tests pass, the mutant "survived".
+
+mutmut is for local runs only. CI does not run it. It is in the `mutation` dependency
+group, thus `uv sync` does not install it. The `task mutate` commands install it.
+
+```bash
+task mutate                                       # test all the mutants that have no result
+task mutate -- "sheridan.diffract._classifier.*"  # test only the selected mutants
+task mutate:results                               # list the mutants that survived
+task mutate:browse                                # examine the mutants in a terminal UI
+task mutate:clean                                 # delete the results (mutants/)
+```
+
+mutmut keeps its results in `mutants/`. Thus, `task mutate` with no pattern tests only
+the mutants that have no result, for example the mutants in a function that changed.
+A pattern selects mutants by name, for example
+`"sheridan.diffract._differ.x__diff_function*"`. mutmut always tests the selected
+mutants again, also if they have a result.
+
+A new or changed test does not reset a result. Thus, after you add tests for the
+mutants that survived, give a pattern for each function to test them again.
+
+### Read the results
+
+`task mutate` shows a count for each status:
+
+- 🎉 killed: a test failed. This is the correct result.
+- 🙁 survived: all the tests passed. The tests do not check this change.
+- 🧙 caught by type check: pyrefly found a type error in the mutant. mutmut does not
+  run the tests for it.
+- 🫥 no tests: no test calls the function.
+- ⏰ timeout: the tests ran for too long.
+
+To see the change in a mutant, run `uv run --group mutation mutmut show <name>`, or
+use `task mutate:browse`. For each mutant that survived, decide which of these it is:
+
+- A test gap: a change to the behavior that no test finds. Write a test that fails
+  with the mutant.
+- An equivalent mutant: the change does not change the behavior. An example is a
+  `case _: return None` arm at the end of a function, because the function then
+  returns `None` anyway.
+
+Use `# pragma: no mutate` only for an equivalent mutant. Write the reason in the same
+comment, after a comma:
+
+```python
+return path.name or "."  # pragma: no mutate, Path.name is empty only for "/"
+```
+
+Put the comma before the reason. If the reason starts with `block`, `start` or `end`
+and has no comma, mutmut reads that word as a different pragma.
+
+### Limits
+
+- mutmut changes only code in functions. It does not change constants or tables at
+  module level.
+- mutmut must have `fork`, thus it does not run on Windows. Use WSL.
+- The functional tests run the installed `diffract` command in a subprocess. This
+  process imports the code from `src/`, not the mutated copy. Thus, only the unit
+  tests can kill a mutant.
+- If you change `only_mutate` or `do_not_mutate` in `[tool.mutmut]`, run
+  `task mutate:clean` first. If you do not, mutmut can keep a plain copy of a file
+  in `mutants/` and show errors for its mutants.
+- If most of the mutants show 🫥 no tests, run `task mutate:clean`, then run
+  `task mutate` again. mutmut mutates a file again only if the source file is newer
+  than its copy in `mutants/`. Thus, a plain copy of a file can stay in `mutants/`
+  after a run that stopped or failed. The tests then call no mutated function in
+  that file.
+
 ## Commit format
 
 This project uses [Commitizen](https://commitizen-tools.github.io/commitizen/) to make

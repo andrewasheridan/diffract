@@ -67,6 +67,26 @@ tasks:
           exit 1
         fi
 
+  mutate:
+    desc: Run mutation testing with mutmut (give a pattern to select functions)
+    cmds:
+      - uv run --group mutation mutmut run {{.CLI_ARGS}}
+
+  mutate:results:
+    desc: List the mutants that survived the last mutmut run
+    cmds:
+      - uv run --group mutation mutmut results
+
+  mutate:browse:
+    desc: Open the mutmut terminal UI to examine the mutants
+    cmds:
+      - uv run --group mutation mutmut browse
+
+  mutate:clean:
+    desc: Delete the mutmut results (mutants/)
+    cmds:
+      - rm -rf mutants/
+
   api:update:
     desc: Write the public API of src/sheridan/ to api.txt
     cmds:
