@@ -101,7 +101,6 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "base_ref",
         nargs="?",
-        default=None,
         metavar="BASE_REF",
         help=(
             "The earlier git ref to compare (default: HEAD~1). "
@@ -112,7 +111,6 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "head_ref",
         nargs="?",
-        default=None,
         metavar="HEAD_REF",
         help=(
             "The later git ref to compare (default: HEAD). "
@@ -123,14 +121,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--src",
-        default=None,
         metavar="SRC",
         dest="src_path",
         help="The directory in the repository that contains the Python packages (default: src).",
     )
     parser.add_argument(
         "--tests",
-        default=None,
         metavar="TESTS",
         dest="tests_path",
         help="The directory in the repository that contains the tests (default: tests).",
@@ -144,7 +140,6 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--exit-code",
         action="store_true",
-        dest="exit_code",
         help=(
             "Exit 1 if a public name was removed or had a breaking change, 2 if a public name was added "
             "or had a change that only adds to it, and 0 if no public name changed."
@@ -152,7 +147,6 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--validate-msg-file",
-        dest="validate_msg_file",
         metavar="MSGFILE",
         help=(
             "The path of a commit message file. The check fails if the commit type is not "
@@ -277,7 +271,8 @@ def _parse_written_type(message: str) -> _WrittenType | None:
         The written type, or ``None`` if the first line has no type or an unknown type.
     """
     lines = message.splitlines()
-    first_line = lines[0] if lines else ""
+    # Each first line with no type gives None, thus a different default text has no effect.
+    first_line = lines[0] if lines else ""  # pragma: no mutate
     m = _COMMIT_TYPE_RE.match(first_line)
     if m is None or m.group(1) not in _CONVENTIONAL_TYPES:
         return None
@@ -429,7 +424,8 @@ def _run() -> None:
     if args.validate_msg_file is not None:
         msg_path = Path(args.validate_msg_file)
         try:
-            raw = msg_path.read_text(encoding="utf-8")
+            # The case of a codec name has no effect. Only a locale that is not UTF-8 shows a missing encoding.
+            raw = msg_path.read_text(encoding="utf-8")  # pragma: no mutate
         except OSError as exc:
             print(f"diffract: cannot read the commit message file: {exc}", file=sys.stderr)
             sys.exit(_ERROR_EXIT_CODE)

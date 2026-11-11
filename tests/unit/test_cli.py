@@ -1,12 +1,15 @@
 """Tests for sheridan.diffract._cli."""
 
+import argparse
 import json
 import sys
 from pathlib import Path
 
 import pytest
 
+from sheridan.diffract import __version__
 from sheridan.diffract._cli import (
+    _build_parser,
     _describe_allowed,
     _format_commit_type,
     _format_human,
@@ -18,9 +21,9 @@ from sheridan.diffract._cli import (
     main,
 )
 from sheridan.diffract._config import DiffractConfig
-from sheridan.diffract._enums import CommitType
+from sheridan.diffract._enums import ChangeKind, CommitType
 from sheridan.diffract._exceptions import GitError
-from sheridan.diffract._models import ApiDiff, DiffractResult
+from sheridan.diffract._models import ApiDiff, DiffractResult, NameChange, SignatureChange
 
 
 def _make_result(
@@ -40,8 +43,163 @@ def _make_result(
     )
 
 
+_MSG_FILE_HELP = (
+    "The path of a commit message file. The check fails if the commit type is not "
+    "possible for the change. Removed public names and breaking changes need a '!' or a "
+    "'BREAKING CHANGE:' footer. Added public names need 'feat' or a '!'. Code changes need "
+    "fix, refactor, perf, style, feat or a '!'. Test changes need test. Other changes need "
+    "docs, ci, chore or build. A message with no known type fails. diffract does not check "
+    "merge, revert, fixup and squash messages from git."
+)
+
+# One row for each argument: (option strings, dest, nargs, default, metavar, help, action class).
+_EXPECTED_ACTIONS: list[tuple[list[str], str, int | str | None, object, str | None, str, str]] = [
+    (["-h", "--help"], "help", 0, argparse.SUPPRESS, None, "show this help message and exit", "_HelpAction"),
+    (["--version"], "version", 0, argparse.SUPPRESS, None, "show program's version number and exit", "_VersionAction"),
+    (
+        [],
+        "base_ref",
+        "?",
+        None,
+        "BASE_REF",
+        "The earlier git ref to compare (default: HEAD~1). "
+        "If you use --validate-msg-file and give no refs, "
+        "diffract compares HEAD with the staging area.",
+        "_StoreAction",
+    ),
+    (
+        [],
+        "head_ref",
+        "?",
+        None,
+        "HEAD_REF",
+        "The later git ref to compare (default: HEAD). "
+        "If you give only BASE_REF, diffract uses HEAD as HEAD_REF. "
+        "If you use --validate-msg-file and give no refs, "
+        "diffract compares HEAD with the staging area.",
+        "_StoreAction",
+    ),
+    (
+        ["--src"],
+        "src_path",
+        None,
+        None,
+        "SRC",
+        "The directory in the repository that contains the Python packages (default: src).",
+        "_StoreAction",
+    ),
+    (
+        ["--tests"],
+        "tests_path",
+        None,
+        None,
+        "TESTS",
+        "The directory in the repository that contains the tests (default: tests).",
+        "_StoreAction",
+    ),
+    (["--json"], "output_json", 0, False, None, "Write JSON to stdout, not text.", "_StoreTrueAction"),
+    (
+        ["--exit-code"],
+        "exit_code",
+        0,
+        False,
+        None,
+        "Exit 1 if a public name was removed or had a breaking change, 2 if a public name was added "
+        "or had a change that only adds to it, and 0 if no public name changed.",
+        "_StoreTrueAction",
+    ),
+    (["--validate-msg-file"], "validate_msg_file", None, None, "MSGFILE", _MSG_FILE_HELP, "_StoreAction"),
+]
+
+
+class TestBuildParser:
+    """Tests for _build_parser().
+
+    The functional tests start the CLI in a subprocess, thus mutmut cannot see them.
+    These tests examine the parser directly.
+    """
+
+    def test_prog_and_description(self) -> None:
+        """The parser must have the correct program name and description."""
+        parser = _build_parser()
+        assert parser.prog == "diffract"
+        assert parser.description == (
+            "Find the public API changes between two git refs and give the possible commit types."
+        )
+
+    def test_actions(self) -> None:
+        """Each argument must have the correct flags, destination, default, metavar and help."""
+        actions = [
+            (
+                action.option_strings,
+                action.dest,
+                action.nargs,
+                action.default,
+                action.metavar,
+                action.help,
+                type(action).__name__,
+            )
+            for action in _build_parser()._actions
+        ]
+        assert actions == _EXPECTED_ACTIONS
+
+    def test_version(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """The --version flag must write the program name and the version."""
+        with pytest.raises(SystemExit) as exc_info:
+            _build_parser().parse_args(["--version"])
+        assert exc_info.value.code == 0
+        assert capsys.readouterr().out == f"diffract {__version__}\n"
+
+    def test_usage_error_exits_three(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """A usage error must exit 3 and write the error to stderr."""
+        with pytest.raises(SystemExit) as exc_info:
+            _build_parser().parse_args(["--unknown"])
+        assert exc_info.value.code == 3
+        assert "diffract: error: unrecognized arguments: --unknown" in capsys.readouterr().err
+
+
 class TestFormatHuman:
     """Tests for _format_human()."""
+
+    def test_full_output_for_all_kinds_of_change(self) -> None:
+        """The output must have each section, with the exact headings, markers and blank lines."""
+        diff = ApiDiff(
+            added=(NameChange(module="pkg.mod", name="New", kind=ChangeKind.added),),
+            removed=(NameChange(module="pkg.mod", name="Old", kind=ChangeKind.removed),),
+            changed=(
+                SignatureChange(module="pkg.mod", name="f", detail="parameter 'x' was removed", is_breaking=True),
+                SignatureChange(module="pkg.mod", name="g", detail="*args was added", is_breaking=False),
+            ),
+        )
+
+        output = _format_human(_make_result(CommitType.feat_breaking, diff))
+
+        assert output == (
+            "Detected: feat!  (breaking change)\n"
+            "\n"
+            "Removed public names:\n"
+            "  pkg.mod:\n"
+            "    - Old\n"
+            "Added public names:\n"
+            "  pkg.mod:\n"
+            "    + New\n"
+            "Breaking changes:\n"
+            "  pkg.mod:\n"
+            "    ! f: parameter 'x' was removed\n"
+            "Changes that add to public names:\n"
+            "  pkg.mod:\n"
+            "    ~ g: *args was added\n"
+            "\n"
+            "Suggested commit prefix: feat!:"
+        )
+
+    def test_full_output_for_no_change(self, empty_diff: ApiDiff) -> None:
+        """The output for a result with no API change must have the exact text and blank lines."""
+        output = _format_human(_make_result(CommitType.other, empty_diff))
+
+        assert output == (
+            "Detected: other\n\nThe public API did not change.\n\nThis can be a docs, ci, chore or build commit."
+        )
 
     def test_no_changes_output(self) -> None:
         """The output for an other result must give the possible types and no prefix."""
@@ -166,9 +324,11 @@ class TestMain:
         with pytest.raises(SystemExit) as exc_info:
             main()
         assert exc_info.value.code == 0
-        parsed = json.loads(capsys.readouterr().out)
+        out = capsys.readouterr().out
+        parsed = json.loads(out)
         assert parsed["group"] == "other"
         assert parsed["possible_types"] == ["docs", "ci", "chore", "build"]
+        assert out == json.dumps(result.to_dict(), indent=2) + "\n"
 
     def test_diffract_error_exits_three(
         self,
@@ -411,6 +571,47 @@ class TestMain:
             main()
         assert mock_check.call_args.kwargs["tests_path"] == "qa"
 
+    def test_check_gets_the_current_directory_and_the_flags(
+        self,
+        tmp_path: Path,
+        empty_diff: ApiDiff,
+        monkeypatch: pytest.MonkeyPatch,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        """check() must get the current directory as repo_path, and the --src and --tests values."""
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(sys, "argv", ["diffract", "--src", "lib", "--tests", "qa"])
+        mocker.patch("sheridan.diffract._cli.get_repo", side_effect=GitError("no repo"))
+        mock_check = mocker.patch(
+            "sheridan.diffract._cli.check", return_value=_make_result(CommitType.other, empty_diff)
+        )
+        with pytest.raises(SystemExit):
+            main()
+        mock_check.assert_called_once_with(
+            base_ref="HEAD~1", head_ref="HEAD", repo_path=Path.cwd(), src_path="lib", tests_path="qa"
+        )
+
+    def test_check_staged_gets_the_current_directory_and_the_flags(
+        self,
+        tmp_path: Path,
+        empty_diff: ApiDiff,
+        monkeypatch: pytest.MonkeyPatch,
+        mocker: pytest.fixture,  # type: ignore[type-arg]
+    ) -> None:
+        """check_staged() must get the current directory as repo_path, and the --src and --tests values."""
+        monkeypatch.chdir(tmp_path)
+        msg_file = tmp_path / "COMMIT_EDITMSG"
+        msg_file.write_text("docs: x\n", encoding="utf-8")
+        argv = ["diffract", "--src", "lib", "--tests", "qa", "--validate-msg-file", str(msg_file)]
+        monkeypatch.setattr(sys, "argv", argv)
+        mocker.patch("sheridan.diffract._cli.get_repo", side_effect=GitError("no repo"))
+        mock_check = mocker.patch(
+            "sheridan.diffract._cli.check_staged", return_value=_make_result(CommitType.other, empty_diff)
+        )
+        with pytest.raises(SystemExit):
+            main()
+        mock_check.assert_called_once_with(repo_path=Path.cwd(), src_path="lib", tests_path="qa")
+
 
 class TestParseWrittenType:
     """Unit tests for _parse_written_type()."""
@@ -437,6 +638,7 @@ class TestParseWrittenType:
             ("revert: undo x", _WrittenType("revert", None, breaking=False)),
             ("fix: x\n\nBREAKING CHANGE: y", _WrittenType("fix", None, breaking=True)),
             ("chore: x\n\nBREAKING-CHANGE: y", _WrittenType("chore", None, breaking=True)),
+            ("fix: x\nBREAKING CHANGE: y", _WrittenType("fix", None, breaking=True)),
             ("fix: BREAKING CHANGE: y", _WrittenType("fix", None, breaking=False)),
             ("fix: x\n\nNot a BREAKING CHANGE: y", _WrittenType("fix", None, breaking=False)),
             ("wip: something", None),

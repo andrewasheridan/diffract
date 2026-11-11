@@ -101,21 +101,40 @@ class TestLoadConfig:
         """load_config must raise DiffractError that names diffract.toml if src is not a string."""
         config_file = tmp_path / "diffract.toml"
         config_file.write_text("src = 3\n", encoding="utf-8")
-        with pytest.raises(DiffractError, match=re.escape(str(config_file))):
+        with pytest.raises(DiffractError) as exc_info:
             load_config(tmp_path)
+
+        assert str(exc_info.value) == (
+            f"Incorrect diffract configuration in {config_file}: 'src' must be a string, not 'int'"
+        )
 
     def test_tool_diffract_not_a_table_raises(self, tmp_path: Path) -> None:
         """load_config must raise DiffractError that names pyproject.toml if tool.diffract is not a table."""
         config_file = tmp_path / "pyproject.toml"
         config_file.write_text('[tool]\ndiffract = "x"\n', encoding="utf-8")
-        with pytest.raises(DiffractError, match=re.escape(str(config_file))):
+        with pytest.raises(DiffractError) as exc_info:
             load_config(tmp_path)
+
+        assert str(exc_info.value) == (
+            f"Incorrect diffract configuration in {config_file}: 'tool.diffract' must be a table, not 'str'"
+        )
 
     def test_tool_not_a_table_raises(self, tmp_path: Path) -> None:
         """load_config must raise DiffractError that names pyproject.toml if tool is not a table."""
         config_file = tmp_path / "pyproject.toml"
         config_file.write_text('tool = "x"\n', encoding="utf-8")
-        with pytest.raises(DiffractError, match=re.escape(str(config_file))):
+        with pytest.raises(DiffractError) as exc_info:
+            load_config(tmp_path)
+
+        assert str(exc_info.value) == (
+            f"Incorrect diffract configuration in {config_file}: 'tool' must be a table, not 'str'"
+        )
+
+    def test_incorrect_toml_raises(self, tmp_path: Path) -> None:
+        """load_config must raise DiffractError that names the file if the file is not correct TOML."""
+        config_file = tmp_path / "diffract.toml"
+        config_file.write_text("src = \n", encoding="utf-8")
+        with pytest.raises(DiffractError, match=f"^Cannot parse {re.escape(str(config_file))}: "):
             load_config(tmp_path)
 
 

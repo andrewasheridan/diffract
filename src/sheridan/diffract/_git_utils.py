@@ -55,9 +55,13 @@ def _read_api(api_root: Path) -> ApiSurface:
         A map of each dotted module name to its iceberg ``Module``.
     """
     api = get_public_api(api_root)
-    prefix = "" if (api_root / "__init__.py").exists() else f"{api_root.name}."
+    modules = {module.name: module for module in _iter_modules(api)}
+    # A file system that ignores case also finds "__INIT__.PY". Thus a test cannot find a change to the case.
+    if (api_root / "__init__.py").exists():  # pragma: no mutate
+        return modules
 
-    return {module.name.removeprefix(prefix): module for module in _iter_modules(api)}
+    prefix = f"{api_root.name}."
+    return {name.removeprefix(prefix): module for name, module in modules.items()}
 
 
 _PYTHON_SUFFIXES = (".py", ".pyi")
@@ -135,7 +139,8 @@ def _extract_src(repo: Repo, treeish: str, src_path: str, dest: Path) -> Path | 
     try:
         proc = repo.git.archive(treeish, *pathspec, format="tar", as_process=True)
         with tarfile.open(fileobj=proc.stdout, mode="r|") as tar:
-            tar.extractall(dest, filter="data")
+            # Python 3.14 and later use the "data" filter by default. The argument shows the filter.
+            tar.extractall(dest, filter="data")  # pragma: no mutate
         proc.wait()
     except (GitCommandError, tarfile.TarError) as exc:
         raise GitError(f"Cannot extract {src_path!r} at {treeish!r}: {exc}") from exc
